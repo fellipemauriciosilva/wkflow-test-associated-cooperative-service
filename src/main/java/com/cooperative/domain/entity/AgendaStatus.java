@@ -9,3 +9,4 @@ public enum AgendaStatus {
     OPEN,
     CLOSED
 }
+
