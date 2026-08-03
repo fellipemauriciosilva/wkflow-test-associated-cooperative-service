@@ -19,7 +19,7 @@ public final class AssociateId {
         return new AssociateId(value);
     }
 
-    public static AssociateId newId() {
+    public static AssociateId generate() {
         return new AssociateId(UUID.randomUUID());
     }
 

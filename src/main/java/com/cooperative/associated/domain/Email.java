@@ -26,34 +26,31 @@ public final class Email {
         if (rawValue == null || rawValue.isBlank()) {
             return new Email(null);
         }
-        if (!EMAIL_PATTERN.matcher(rawValue).matches()) {
+        String trimmed = rawValue.trim();
+        if (!EMAIL_PATTERN.matcher(trimmed).matches()) {
             throw new InvalidAssociateDataException("email format is invalid");
         }
-        return new Email(rawValue.trim());
-    }
-
-    public static Email empty() {
-        return new Email(null);
-    }
-
-    public Optional<String> getValue() {
-        return Optional.ofNullable(value);
+        return new Email(trimmed);
     }
 
     public boolean isPresent() {
         return value != null;
     }
 
+    public Optional<String> getValue() {
+        return Optional.ofNullable(value);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof Email email)) return false;
-        return Objects.equals(value, email.value);
+        if (!(o instanceof Email that)) return false;
+        return Objects.equals(value, that.value);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(value);
+        return Objects.hash(value);
     }
 
     @Override

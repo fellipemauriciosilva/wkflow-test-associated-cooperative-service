@@ -30,8 +30,8 @@ public final class Document {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof Document document)) return false;
-        return value.equals(document.value);
+        if (!(o instanceof Document that)) return false;
+        return value.equals(that.value);
     }
 
     @Override
