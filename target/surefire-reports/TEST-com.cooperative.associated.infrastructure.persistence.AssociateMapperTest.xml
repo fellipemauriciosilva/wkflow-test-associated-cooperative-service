@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.cooperative.associated.architecture.ArchitectureTest" time="12.087" tests="5" errors="0" skipped="0" failures="0">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.cooperative.associated.infrastructure.persistence.AssociateMapperTest" time="0.035" tests="4" errors="0" skipped="0" failures="0">
   <properties>
     <property name="java.specification.version" value="21"/>
     <property name="sun.jnu.encoding" value="UTF-8"/>
@@ -55,12 +55,8 @@
     <property name="sun.io.unicode.encoding" value="UnicodeLittle"/>
     <property name="java.class.version" value="65.0"/>
   </properties>
-  <testcase name="domainClassesShouldNotDependOnHttpOrServletApis" classname="com.cooperative.associated.architecture.ArchitectureTest" time="0.44">
-    <system-out><![CDATA[20:37:06.765 [main] INFO com.tngtech.archunit.core.PluginLoader -- Detected Java version 21.0.11
-]]></system-out>
-  </testcase>
-  <testcase name="domainPackageShouldNotDependOnInfrastructureOrApplication" classname="com.cooperative.associated.architecture.ArchitectureTest" time="0.005"/>
-  <testcase name="domainClassesShouldNotDependOnKafka" classname="com.cooperative.associated.architecture.ArchitectureTest" time="0.006"/>
-  <testcase name="domainClassesShouldNotDependOnJpa" classname="com.cooperative.associated.architecture.ArchitectureTest" time="0.005"/>
-  <testcase name="domainClassesShouldNotDependOnSpringFramework" classname="com.cooperative.associated.architecture.ArchitectureTest" time="0.005"/>
+  <testcase name="shouldMapDomainToJpaEntity" classname="com.cooperative.associated.infrastructure.persistence.AssociateMapperTest" time="0.023"/>
+  <testcase name="shouldRoundTripDomainToJpaAndBack" classname="com.cooperative.associated.infrastructure.persistence.AssociateMapperTest" time="0.002"/>
+  <testcase name="shouldMapJpaEntityWithNullEmailToDomain" classname="com.cooperative.associated.infrastructure.persistence.AssociateMapperTest" time="0.005"/>
+  <testcase name="shouldMapJpaEntityToDomain" classname="com.cooperative.associated.infrastructure.persistence.AssociateMapperTest" time="0.002"/>
 </testsuite>

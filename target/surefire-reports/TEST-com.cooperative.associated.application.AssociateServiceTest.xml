@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.cooperative.associated.architecture.ArchitectureTest" time="12.087" tests="5" errors="0" skipped="0" failures="0">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.cooperative.associated.application.AssociateServiceTest" time="5.661" tests="10" errors="0" skipped="0" failures="0">
   <properties>
     <property name="java.specification.version" value="21"/>
     <property name="sun.jnu.encoding" value="UTF-8"/>
@@ -55,12 +55,21 @@
     <property name="sun.io.unicode.encoding" value="UnicodeLittle"/>
     <property name="java.class.version" value="65.0"/>
   </properties>
-  <testcase name="domainClassesShouldNotDependOnHttpOrServletApis" classname="com.cooperative.associated.architecture.ArchitectureTest" time="0.44">
-    <system-out><![CDATA[20:37:06.765 [main] INFO com.tngtech.archunit.core.PluginLoader -- Detected Java version 21.0.11
-]]></system-out>
+  <testcase name="shouldDeleteExistingAssociate" classname="com.cooperative.associated.application.AssociateServiceTest" time="4.51">
+    <system-err><![CDATA[Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build what is described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org/mockito/Mockito.html#0.3
+WARNING: A Java agent has been loaded dynamically (/root/.m2/repository/net/bytebuddy/byte-buddy-agent/1.15.11/byte-buddy-agent-1.15.11.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+]]></system-err>
   </testcase>
-  <testcase name="domainPackageShouldNotDependOnInfrastructureOrApplication" classname="com.cooperative.associated.architecture.ArchitectureTest" time="0.005"/>
-  <testcase name="domainClassesShouldNotDependOnKafka" classname="com.cooperative.associated.architecture.ArchitectureTest" time="0.006"/>
-  <testcase name="domainClassesShouldNotDependOnJpa" classname="com.cooperative.associated.architecture.ArchitectureTest" time="0.005"/>
-  <testcase name="domainClassesShouldNotDependOnSpringFramework" classname="com.cooperative.associated.architecture.ArchitectureTest" time="0.005"/>
+  <testcase name="shouldCreateAssociateWhenDocumentIsNotDuplicate" classname="com.cooperative.associated.application.AssociateServiceTest" time="0.604"/>
+  <testcase name="shouldThrowWhenUpdatingNonExistentAssociate" classname="com.cooperative.associated.application.AssociateServiceTest" time="0.028"/>
+  <testcase name="shouldFindAssociateById" classname="com.cooperative.associated.application.AssociateServiceTest" time="0.004"/>
+  <testcase name="shouldReturnAllAssociates" classname="com.cooperative.associated.application.AssociateServiceTest" time="0.399"/>
+  <testcase name="shouldThrowWhenUpdatingToDuplicateDocumentOfAnotherAssociate" classname="com.cooperative.associated.application.AssociateServiceTest" time="0.006"/>
+  <testcase name="shouldUpdateAssociateWhenDataIsValid" classname="com.cooperative.associated.application.AssociateServiceTest" time="0.004"/>
+  <testcase name="shouldThrowWhenAssociateNotFoundById" classname="com.cooperative.associated.application.AssociateServiceTest" time="0.003"/>
+  <testcase name="shouldThrowWhenCreatingWithDuplicateDocument" classname="com.cooperative.associated.application.AssociateServiceTest" time="0.002"/>
+  <testcase name="shouldThrowWhenDeletingNonExistentAssociate" classname="com.cooperative.associated.application.AssociateServiceTest" time="0.005"/>
 </testsuite>

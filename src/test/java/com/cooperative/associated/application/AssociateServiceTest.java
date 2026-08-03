@@ -163,3 +163,4 @@ class AssociateServiceTest {
         verify(repository, never()).deleteById(any());
     }
 }
+

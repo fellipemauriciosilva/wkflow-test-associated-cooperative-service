@@ -66,3 +66,4 @@ class AssociateMapperTest {
         assertThat(result.getCreatedAt()).isEqualTo(original.getCreatedAt());
     }
 }
+

@@ -1,3 +1,5 @@
+com/cooperative/associated/application/AssociateServiceTest.class
 com/cooperative/associated/infrastructure/rest/AssociateControllerIT.class
+com/cooperative/associated/infrastructure/persistence/AssociateMapperTest.class
 com/cooperative/associated/domain/AssociateTest.class
 com/cooperative/associated/architecture/ArchitectureTest.class
