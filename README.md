@@ -18,3 +18,5 @@ Foundational domain entities (Associate, Assembly) with CRUD operations, hexagon
 
 ## Project Structure
 
+
+

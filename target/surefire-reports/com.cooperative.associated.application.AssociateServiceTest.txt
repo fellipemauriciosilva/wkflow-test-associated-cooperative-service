@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.cooperative.associated.application.AssociateServiceTest
+-------------------------------------------------------------------------------
+Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 8.821 s -- in com.cooperative.associated.application.AssociateServiceTest
