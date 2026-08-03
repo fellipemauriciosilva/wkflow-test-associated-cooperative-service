@@ -1,5 +1,8 @@
 /workspace/tn_acme/run_5f6115b27c77/wkflow-test-associated-cooperative-service/src/test/java/com/cooperative/associated/application/AssociateServiceTest.java
 /workspace/tn_acme/run_5f6115b27c77/wkflow-test-associated-cooperative-service/src/test/java/com/cooperative/associated/architecture/ArchitectureTest.java
 /workspace/tn_acme/run_5f6115b27c77/wkflow-test-associated-cooperative-service/src/test/java/com/cooperative/associated/domain/AssociateTest.java
+/workspace/tn_acme/run_5f6115b27c77/wkflow-test-associated-cooperative-service/src/test/java/com/cooperative/associated/domain/DocumentTest.java
+/workspace/tn_acme/run_5f6115b27c77/wkflow-test-associated-cooperative-service/src/test/java/com/cooperative/associated/domain/DomainIsolationTest.java
+/workspace/tn_acme/run_5f6115b27c77/wkflow-test-associated-cooperative-service/src/test/java/com/cooperative/associated/domain/EmailTest.java
 /workspace/tn_acme/run_5f6115b27c77/wkflow-test-associated-cooperative-service/src/test/java/com/cooperative/associated/infrastructure/persistence/AssociateMapperTest.java
 /workspace/tn_acme/run_5f6115b27c77/wkflow-test-associated-cooperative-service/src/test/java/com/cooperative/associated/infrastructure/rest/AssociateControllerIT.java

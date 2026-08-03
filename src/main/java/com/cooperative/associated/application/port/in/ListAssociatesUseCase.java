@@ -11,3 +11,5 @@ public interface ListAssociatesUseCase {
 
     List<Associate> findAll();
 }
+
+

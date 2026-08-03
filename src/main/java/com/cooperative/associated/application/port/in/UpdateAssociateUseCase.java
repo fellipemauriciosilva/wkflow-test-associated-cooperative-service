@@ -11,3 +11,5 @@ public interface UpdateAssociateUseCase {
 
     Associate update(UUID id, String name, String document, String email);
 }
+
+

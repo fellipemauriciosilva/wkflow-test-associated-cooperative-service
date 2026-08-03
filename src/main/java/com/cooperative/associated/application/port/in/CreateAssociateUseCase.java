@@ -9,3 +9,5 @@ public interface CreateAssociateUseCase {
 
     Associate create(String name, String document, String email);
 }
+
+

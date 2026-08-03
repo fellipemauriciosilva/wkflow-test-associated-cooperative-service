@@ -9,3 +9,5 @@ public interface DeleteAssociateUseCase {
 
     void delete(UUID id);
 }
+
+

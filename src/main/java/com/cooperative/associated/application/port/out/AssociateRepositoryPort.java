@@ -23,3 +23,5 @@ public interface AssociateRepositoryPort {
     void deleteById(UUID id);
 }
 
+
+

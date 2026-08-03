@@ -56,3 +56,5 @@ public class AssociateRepositoryAdapter implements AssociateRepositoryPort {
     }
 }
 
+
+

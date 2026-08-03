@@ -60,3 +60,5 @@ public class AssociateService {
         repository.deleteById(id);
     }
 }
+
+

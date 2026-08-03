@@ -11,3 +11,5 @@ public interface GetAssociateUseCase {
 
     Associate findById(UUID id);
 }
+
+

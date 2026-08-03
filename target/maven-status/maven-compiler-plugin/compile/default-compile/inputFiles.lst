@@ -2,8 +2,16 @@
 /workspace/tn_acme/run_5f6115b27c77/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/application/AssociateService.java
 /workspace/tn_acme/run_5f6115b27c77/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/application/exception/AssociateNotFoundException.java
 /workspace/tn_acme/run_5f6115b27c77/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/application/exception/DuplicateDocumentException.java
+/workspace/tn_acme/run_5f6115b27c77/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/application/port/in/CreateAssociateUseCase.java
+/workspace/tn_acme/run_5f6115b27c77/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/application/port/in/DeleteAssociateUseCase.java
+/workspace/tn_acme/run_5f6115b27c77/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/application/port/in/GetAssociateUseCase.java
+/workspace/tn_acme/run_5f6115b27c77/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/application/port/in/ListAssociatesUseCase.java
+/workspace/tn_acme/run_5f6115b27c77/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/application/port/in/UpdateAssociateUseCase.java
 /workspace/tn_acme/run_5f6115b27c77/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/application/port/out/AssociateRepositoryPort.java
 /workspace/tn_acme/run_5f6115b27c77/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/domain/Associate.java
+/workspace/tn_acme/run_5f6115b27c77/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/domain/AssociateId.java
+/workspace/tn_acme/run_5f6115b27c77/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/domain/Document.java
+/workspace/tn_acme/run_5f6115b27c77/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/domain/Email.java
 /workspace/tn_acme/run_5f6115b27c77/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/domain/exception/InvalidAssociateDataException.java
 /workspace/tn_acme/run_5f6115b27c77/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/infrastructure/config/OpenApiConfig.java
 /workspace/tn_acme/run_5f6115b27c77/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/infrastructure/persistence/AssociateJpaEntity.java

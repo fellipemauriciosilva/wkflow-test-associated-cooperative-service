@@ -7,3 +7,5 @@ CREATE TABLE associates (
     CONSTRAINT uq_associates_document UNIQUE (document)
 );
 
+
+

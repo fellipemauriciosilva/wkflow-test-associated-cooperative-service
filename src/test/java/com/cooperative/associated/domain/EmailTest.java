@@ -63,3 +63,5 @@ class EmailTest {
         assertEquals(a.hashCode(), b.hashCode());
     }
 }
+
+
