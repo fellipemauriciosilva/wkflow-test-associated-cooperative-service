@@ -7,7 +7,6 @@ import com.cooperative.associated.domain.Associate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -25,7 +24,7 @@ public class AssociateService {
         if (repository.existsByDocument(document)) {
             throw new DuplicateDocumentException(document);
         }
-        Associate associate = Associate.create(UUID.randomUUID(), name, document, email, Instant.now());
+        Associate associate = Associate.create(name, document, email);
         return repository.save(associate);
     }
 
@@ -47,8 +46,10 @@ public class AssociateService {
         if (repository.existsByDocumentAndIdNot(document, id)) {
             throw new DuplicateDocumentException(document);
         }
-        Associate updated = existing.update(name, document, email);
-        return repository.save(updated);
+        existing.changeName(name);
+        existing.changeDocument(document);
+        existing.changeEmail(email);
+        return repository.save(existing);
     }
 
     @Transactional

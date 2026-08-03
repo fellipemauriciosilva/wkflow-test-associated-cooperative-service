@@ -91,3 +91,4 @@ class AssociateTest {
         assertThrows(InvalidAssociateDataException.class, () -> associate.changeEmail("not-an-email"));
     }
 }
+

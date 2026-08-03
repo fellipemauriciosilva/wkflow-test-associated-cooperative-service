@@ -10,3 +10,4 @@ public interface AssociateJpaRepository extends JpaRepository<AssociateJpaEntity
 
     boolean existsByDocumentAndIdNot(String document, UUID id);
 }
+

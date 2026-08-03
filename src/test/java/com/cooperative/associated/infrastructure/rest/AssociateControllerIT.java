@@ -273,3 +273,4 @@ class AssociateControllerIT {
         assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 }
+

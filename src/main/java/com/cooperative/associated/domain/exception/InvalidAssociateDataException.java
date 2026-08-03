@@ -10,3 +10,4 @@ public class InvalidAssociateDataException extends RuntimeException {
         super(message);
     }
 }
+

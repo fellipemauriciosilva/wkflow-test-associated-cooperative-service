@@ -55,3 +55,4 @@ public class AssociateRepositoryAdapter implements AssociateRepositoryPort {
         jpaRepository.deleteById(id);
     }
 }
+

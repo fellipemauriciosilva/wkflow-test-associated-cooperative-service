@@ -10,3 +10,4 @@ public class AssociatedCooperativeServiceApplication {
         SpringApplication.run(AssociatedCooperativeServiceApplication.class, args);
     }
 }
+

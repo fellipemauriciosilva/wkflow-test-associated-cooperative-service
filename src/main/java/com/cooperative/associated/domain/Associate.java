@@ -96,3 +96,4 @@ public final class Associate {
         return Objects.hash(id);
     }
 }
+

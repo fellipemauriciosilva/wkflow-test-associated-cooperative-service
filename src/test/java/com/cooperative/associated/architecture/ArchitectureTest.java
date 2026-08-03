@@ -67,3 +67,4 @@ class ArchitectureTest {
         rule.check(importedClasses);
     }
 }
+

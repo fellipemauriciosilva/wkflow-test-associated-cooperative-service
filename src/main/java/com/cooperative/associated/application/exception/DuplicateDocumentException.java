@@ -6,3 +6,4 @@ public class DuplicateDocumentException extends RuntimeException {
         super("document already registered: " + document);
     }
 }
+

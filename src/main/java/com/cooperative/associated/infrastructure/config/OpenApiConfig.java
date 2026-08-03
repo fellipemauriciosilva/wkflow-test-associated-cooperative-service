@@ -19,3 +19,4 @@ public class OpenApiConfig {
                         .contact(new Contact().name("Cooperative Voting System")));
     }
 }
+

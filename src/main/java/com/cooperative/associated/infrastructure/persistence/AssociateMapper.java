@@ -7,13 +7,13 @@ import org.springframework.stereotype.Component;
 public class AssociateMapper {
 
     public AssociateJpaEntity toJpaEntity(Associate associate) {
-        AssociateJpaEntity entity = new AssociateJpaEntity();
-        entity.setId(associate.getId());
-        entity.setName(associate.getName());
-        entity.setDocument(associate.getDocument());
-        entity.setEmail(associate.getEmail());
-        entity.setCreatedAt(associate.getCreatedAt());
-        return entity;
+        return new AssociateJpaEntity(
+                associate.getId(),
+                associate.getName(),
+                associate.getDocument(),
+                associate.getEmail(),
+                associate.getCreatedAt()
+        );
     }
 
     public Associate toDomain(AssociateJpaEntity entity) {

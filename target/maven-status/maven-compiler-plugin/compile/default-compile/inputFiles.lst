@@ -1,0 +1,16 @@
+/workspace/tn_acme/run_57fc896af6c9/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/AssociatedCooperativeServiceApplication.java
+/workspace/tn_acme/run_57fc896af6c9/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/application/AssociateService.java
+/workspace/tn_acme/run_57fc896af6c9/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/application/exception/AssociateNotFoundException.java
+/workspace/tn_acme/run_57fc896af6c9/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/application/exception/DuplicateDocumentException.java
+/workspace/tn_acme/run_57fc896af6c9/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/application/port/out/AssociateRepositoryPort.java
+/workspace/tn_acme/run_57fc896af6c9/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/domain/Associate.java
+/workspace/tn_acme/run_57fc896af6c9/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/domain/exception/InvalidAssociateDataException.java
+/workspace/tn_acme/run_57fc896af6c9/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/infrastructure/config/OpenApiConfig.java
+/workspace/tn_acme/run_57fc896af6c9/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/infrastructure/persistence/AssociateJpaEntity.java
+/workspace/tn_acme/run_57fc896af6c9/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/infrastructure/persistence/AssociateJpaRepository.java
+/workspace/tn_acme/run_57fc896af6c9/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/infrastructure/persistence/AssociateMapper.java
+/workspace/tn_acme/run_57fc896af6c9/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/infrastructure/persistence/AssociateRepositoryAdapter.java
+/workspace/tn_acme/run_57fc896af6c9/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/infrastructure/rest/AssociateController.java
+/workspace/tn_acme/run_57fc896af6c9/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/infrastructure/rest/GlobalExceptionHandler.java
+/workspace/tn_acme/run_57fc896af6c9/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/infrastructure/rest/dto/AssociateRequest.java
+/workspace/tn_acme/run_57fc896af6c9/wkflow-test-associated-cooperative-service/src/main/java/com/cooperative/associated/infrastructure/rest/dto/AssociateResponse.java

@@ -8,3 +8,4 @@ public class AssociateNotFoundException extends RuntimeException {
         super("associate not found: " + id);
     }
 }
+

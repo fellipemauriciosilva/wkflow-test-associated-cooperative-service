@@ -64,3 +64,4 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return description.replace("uri=", "");
     }
 }
+
