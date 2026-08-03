@@ -29,8 +29,12 @@ public final class AssociateId {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof AssociateId that)) return false;
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof AssociateId that)) {
+            return false;
+        }
         return value.equals(that.value);
     }
 
