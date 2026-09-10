@@ -10,7 +10,9 @@ com/cooperative/associated/domain/AssociateId.class
 com/cooperative/associated/infrastructure/persistence/AssociateMapper.class
 com/cooperative/associated/application/port/in/UpdateAssociateUseCase.class
 com/cooperative/associated/infrastructure/rest/GlobalExceptionHandler.class
+com/cooperative/associated/infrastructure/rest/HealthController$HealthDetailsResponse.class
 com/cooperative/associated/infrastructure/persistence/AssociateRepositoryAdapter.class
+com/cooperative/associated/infrastructure/rest/HealthController.class
 com/cooperative/associated/application/port/out/AssociateRepositoryPort.class
 com/cooperative/associated/AssociatedCooperativeServiceApplication.class
 com/cooperative/associated/domain/Document.class

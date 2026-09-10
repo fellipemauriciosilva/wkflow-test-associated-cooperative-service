@@ -4,5 +4,6 @@ com/cooperative/associated/application/AssociateServiceTest.class
 com/cooperative/associated/domain/EmailTest.class
 com/cooperative/associated/infrastructure/rest/AssociateControllerIT.class
 com/cooperative/associated/domain/DocumentTest.class
+com/cooperative/associated/infrastructure/rest/HealthControllerTest.class
 com/cooperative/associated/domain/AssociateTest.class
 com/cooperative/associated/domain/DomainIsolationTest.class
