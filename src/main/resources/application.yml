@@ -40,5 +40,9 @@ springdoc:
   api-docs:
     path: /v3/api-docs
 
+project:
+  name: associated-cooperative-service
+  version: 0.1.0
+
 
 
