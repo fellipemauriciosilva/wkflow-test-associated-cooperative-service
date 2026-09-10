@@ -1,34 +1,47 @@
-# Build
-target/
-build/
-out/
-*.class
-*.jar
-*.war
-*.ear
-
 # Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.bak
+release.properties
+dependency-reduced-pom.xml
+.flattened-pom.xml
 .mvn/
 mvnw
 mvnw.cmd
 
 # IDE
 .idea/
-*.iml
-*.ipr
-*.iws
 .vscode/
+*.swp
+*.swo
+*.swn
+.DS_Store
+*.iml
+*.iws
+*.ipr
 .settings/
 .project
 .classpath
 
-# Logs
-*.log
-logs/
+# Build
+build/
+out/
+*.class
+*.jar
+*.war
+*.ear
+.gradle/
 
-# Ambiente
+# Runtime
 .env
 .env.local
+logs/
+*.log
+
+# Docker
+docker-compose.override.yml
 
 # SO
 .DS_Store
