@@ -1,0 +1,18 @@
+spring:
+  application:
+    name: @project.name@
+  jmx:
+    enabled: false
+
+app:
+  name: @project.name@
+  version: @project.version@
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
