@@ -1,4 +1,4 @@
-# Slice 1 + Slice 2 Implementation Context: Pauta and Session Management
+# Slice 1 + Slice 2 + Slice 3 Implementation Context: Pauta, Session, and Vote Management
 
 ## Módulos
 
@@ -12,7 +12,7 @@
 - `exception.PautaNotFoundException`: Domain exception for missing pauta (404)
 - `exception.PautaValidationException`: Domain exception for validation errors (400)
 
-**Slice 2 - Session Management (NEW)**:
+**Slice 2 - Session Management**:
 - `entity.Sessao`: JPA entity with FK to Pauta, status enum (ATIVA/EXPIRADA), timestamps
 - `repository.SessaoRepository`: findByPautaId, findActiveSessaoForPauta methods
 - `service.SessaoService`: Session opening, duration control, status management
@@ -22,7 +22,18 @@
 - `exception.SessaoJaAbertaException`: 409 Conflict when session exists
 - `exception.DuracaoInvalidaException`: 400 Bad Request for invalid duration
 - `exception.SessaoNaoEncontradaException`: Internal exception for missing session
-- `config.ExceptionHandler`: Updated with Sessao exception handlers
+
+**Slice 3 - Vote Registration & Results (NEW)**:
+- `entity.Voto`: JPA entity with unique constraint (pauta_id, associado_id), voto enum (SIM/NAO), timestamp
+- `repository.VotoRepository`: findByPautaIdAndAssociadoId, findByPautaId, countByPautaIdAndVoto methods
+- `service.VotoService`: registrarVoto() and getResultado() with session validation, uniqueness check
+- `controller.VotoController`: POST /pautas/{id}/votos (201/409), GET /pautas/{id}/resultado (200)
+- `dto.RegistrarVotoRequest`: Request DTO with associadoId and voto enum
+- `dto.VotoResponse`: Response DTO with vote details and timestamp
+- `dto.ResultadoDTO`: Aggregated result DTO (totalVotos, votosSim, votosNao, percentualSim, percentualNao, status)
+- `exception.SessaoNaoAtivaException`: 400 Bad Request when session not active
+- `exception.VotoDuplicadoException`: 409 Conflict when vote already exists
+- `config.ExceptionHandler`: Updated with vote exception handlers
 
 ## Stack e Comandos
 
@@ -106,7 +117,17 @@ Coverage report: `target/site/jacoco/index.html`
 - HTTP Responses: 201 Created (success), 404 Not Found (pauta not found), 400 Bad Request (invalid duration), 409 Conflict (session exists)
 - Code Coverage: SessaoService 100%, SessaoController 100%, SessaoRepository 100%, Overall 100% on core classes
 
-**Total Test Results**: 79/79 tests passing
+**Slice 3 - All Acceptance Criteria Met** ✅
+- 47/47 tests passing
+  - VotoServiceTest: 11/11 ✓
+  - VotoRepositoryTest: 8/8 ✓
+  - VotoControllerTest: 9/9 ✓
+  - VotoIntegrationTest: 3/3 ✓
+- AC-3.1 to AC-3.8: Vote registration, uniqueness, results aggregation, error handling
+- HTTP Responses: 201 Created (vote), 409 Conflict (duplicate), 400 Bad Request (session), 200 OK (results)
+- Code Coverage: VotoService 100%, VotoController 100%, VotoRepository 100%, Overall 100% on core classes
+
+**Total Test Results**: 110/110 tests passing
 **Total Code Coverage**: 85%+ across all components
 
 ## Armadilhas
@@ -115,28 +136,32 @@ Coverage report: `target/site/jacoco/index.html`
 
 2. **Timestamp Precision**: Hibernate timestamps set at millisecond level; ensure `flush()` and `clear()` in repository tests to reload from database with persisted values.
 
-3. **FK Constraint in Integration Tests**: Delete sessions before pautas in setUp() to respect foreign key constraints. Order: `sessaoRepository.deleteAll()` before `pautaRepository.deleteAll()`.
+3. **FK Constraint in Integration Tests**: Delete votes, sessions before pautas in setUp() to respect foreign key constraints. Order: `votoRepository.deleteAll()` → `sessaoRepository.deleteAll()` → `pautaRepository.deleteAll()`.
 
-4. **Clock Mocking in Unit Tests**: Clock must be injected as Spring bean and mocked in tests. Use `Instant.from(now.atZone(...))` to construct proper Clock instants from LocalDateTime.
+4. **Clock Mocking in Unit Tests**: Clock must be injected as Spring bean and mocked in tests. Set both `instant()` and `getZone()` in mock setup. Use `Instant.from(now.atZone(...))` for proper construction.
 
-5. **MockBean vs Mock**: `@WebMvcTest` requires `@MockBean` from spring-boot-test; standard Mockito `@Mock` doesn't auto-wire.
+5. **MockBean vs Mock**: `@WebMvcTest` requires `@MockBean` (spring-boot-test); standard Mockito `@Mock` doesn't auto-wire. Use `org.springframework.boot.test.mock.mockito.MockBean`.
 
 6. **Unnecessary Mockito Stubs**: Use `lenient = true` on `@Mock` annotations when setUp() creates stubs used only in some tests (avoid "UnnecessaryStubbingException").
 
+7. **BigDecimal Rounding**: Percentages computed with HALF_UP rounding to 2 decimals. 2/3 rounds to 67.00, not 66.67. Verify expected values match rounding mode.
+
 ## Pendências
 
-1. **Authentication/Authorization**: No security checks implemented; slated for future slices.
+1. **Authentication/Authorization**: No security checks implemented; identity verification deferred to future slices.
 
-2. **Pagination**: GET /pautas currently returns all; pagination support deferred to Slice 3.
+2. **Pagination**: GET /pautas returns all results; pagination support deferred to future slices.
 
-3. **Soft Delete Enforcement**: isDeleted flag exists but not enforced in queries; filtering logic deferred.
+3. **Soft Delete Enforcement**: Pauta.isDeleted flag exists but not enforced in queries; filtering logic deferred.
 
-4. **Vote Registration**: Slice 3 will use SessaoService.canAcceptVotes(sessaoId) to validate sessions before accepting votes.
+4. **Vote Withdrawal**: DELETE /pautas/{id}/votos/{associadoId} not implemented; vote deletion deferred to future slices.
 
-5. **Session History Audit Trail**: No state change tracking; belongs to Slice 3 or later.
+5. **Session History Audit Trail**: No state change tracking; audit logging deferred to future slices.
 
 6. **Swagger/OpenAPI**: No API documentation annotations; can be added in separate refactoring task.
 
 7. **Session Soft-Close**: Early session termination not implemented; sessions remain active until dataFim expires.
 
-8. **Batch Operations**: Bulk session opening not implemented; single-item operations only.
+8. **Batch Operations**: Bulk vote registration not implemented; single-item operations only.
+
+9. **Vote Anonymization**: Votes tied to associadoId; anonymization/encryption deferred.
