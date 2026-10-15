@@ -4,6 +4,8 @@ import br.coop.assembly.exception.DuracaoInvalidaException;
 import br.coop.assembly.exception.PautaNotFoundException;
 import br.coop.assembly.exception.PautaValidationException;
 import br.coop.assembly.exception.SessaoJaAbertaException;
+import br.coop.assembly.exception.SessaoNaoAtivaException;
+import br.coop.assembly.exception.VotoDuplicadoException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -67,6 +69,45 @@ public class ExceptionHandler {
         log.warn("Invalid duration: {}", ex.getMessage());
         Map<String, Object> response = buildErrorResponse(
                 ex.getCode(),
+                ex.getMessage(),
+                request
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @org.springframework.web.bind.annotation.ExceptionHandler(SessaoNaoAtivaException.class)
+    public ResponseEntity<Map<String, Object>> handleSessaoNaoAtiva(
+            SessaoNaoAtivaException ex,
+            WebRequest request) {
+        log.warn("Session not active: {}", ex.getMessage());
+        Map<String, Object> response = buildErrorResponse(
+                ex.getCode(),
+                ex.getMessage(),
+                request
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @org.springframework.web.bind.annotation.ExceptionHandler(VotoDuplicadoException.class)
+    public ResponseEntity<Map<String, Object>> handleVotoDuplicado(
+            VotoDuplicadoException ex,
+            WebRequest request) {
+        log.warn("Duplicate vote: {}", ex.getMessage());
+        Map<String, Object> response = buildErrorResponse(
+                ex.getCode(),
+                ex.getMessage(),
+                request
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
+    @org.springframework.web.bind.annotation.ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalArgument(
+            IllegalArgumentException ex,
+            WebRequest request) {
+        log.warn("Illegal argument: {}", ex.getMessage());
+        Map<String, Object> response = buildErrorResponse(
+                "VALIDATION_ERROR",
                 ex.getMessage(),
                 request
         );
