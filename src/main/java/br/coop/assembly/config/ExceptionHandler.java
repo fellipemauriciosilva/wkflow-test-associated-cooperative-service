@@ -1,7 +1,9 @@
 package br.coop.assembly.config;
 
+import br.coop.assembly.exception.DuracaoInvalidaException;
 import br.coop.assembly.exception.PautaNotFoundException;
 import br.coop.assembly.exception.PautaValidationException;
+import br.coop.assembly.exception.SessaoJaAbertaException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -37,6 +39,32 @@ public class ExceptionHandler {
             PautaValidationException ex,
             WebRequest request) {
         log.warn("Validation error: {}", ex.getMessage());
+        Map<String, Object> response = buildErrorResponse(
+                ex.getCode(),
+                ex.getMessage(),
+                request
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @org.springframework.web.bind.annotation.ExceptionHandler(SessaoJaAbertaException.class)
+    public ResponseEntity<Map<String, Object>> handleSessaoJaAberta(
+            SessaoJaAbertaException ex,
+            WebRequest request) {
+        log.warn("Session already open: {}", ex.getMessage());
+        Map<String, Object> response = buildErrorResponse(
+                ex.getCode(),
+                "Sessao ja aberta para esta pauta",
+                request
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
+    @org.springframework.web.bind.annotation.ExceptionHandler(DuracaoInvalidaException.class)
+    public ResponseEntity<Map<String, Object>> handleDuracaoInvalida(
+            DuracaoInvalidaException ex,
+            WebRequest request) {
+        log.warn("Invalid duration: {}", ex.getMessage());
         Map<String, Object> response = buildErrorResponse(
                 ex.getCode(),
                 ex.getMessage(),
