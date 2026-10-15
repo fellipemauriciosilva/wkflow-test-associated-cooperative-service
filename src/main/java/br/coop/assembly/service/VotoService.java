@@ -31,65 +31,12 @@ public class VotoService {
     }
 
     @Transactional
-    public VotoDTO registrarVoto(Long pautaIdL, String associadoId, String votoStr) {
-        log.debug("Registrando voto");
-
-        if (associadoId == null || associadoId.trim().isEmpty()) {
-            throw new AssociadoInvalidoException("Associado invalido");
-        }
-
-        if (!pautaRepository.existsById(Long.valueOf(pautaIdL))) {
-            throw new PautaNotFoundException("Pauta nao encontrada");
-        }
-
-        LocalDateTime now = LocalDateTime.now();
-        Optional<Sessao> sessaoOpt = sessaoRepository.findActiveSessaoForPauta(pautaIdL, now);
-        if (!sessaoOpt.isPresent()) {
-            throw new SessaoNaoAtivaException("Sessao nao esta ativa");
-        }
-
-        Voto.VotoEnum votoEnum;
-        try {
-            votoEnum = Voto.VotoEnum.valueOf(votoStr.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new VotoInvalidoException("Voto invalido");
-        }
-
-        Optional<Voto> existente = votoRepository.findByPautaIdAndAssociadoId(pautaIdL, associadoId);
-        if (existente.isPresent()) {
-            throw new VotoDuplicadoException("Voto duplicado");
-        }
-
-        Pauta pauta = sessaoOpt.get().getPauta();
-        Voto voto = new Voto();
-        voto.setPauta(pauta);
-        voto.setAssociadoId(associadoId);
-        voto.setVoto(votoEnum);
-        Voto saved = votoRepository.save(voto);
-        return VotoDTO.fromEntity(saved);
+    public VotoDTO registrarVoto(Long pautaId, String associadoId, String votoStr) {
+        throw new UnsupportedOperationException("TODO: implement registrarVoto");
     }
 
     @Transactional(readOnly = true)
-    public ResultadoDTO getResultado(Long pautaIdL) {
-        log.debug("Obtendo resultado");
-
-        if (!pautaRepository.existsById(Long.valueOf(pautaIdL))) {
-            throw new PautaNotFoundException("Pauta nao encontrada");
-        }
-
-        List<Voto> votos = votoRepository.findByPautaId(pautaIdL);
-        int sim = (int) votos.stream().filter(v -> v.getVoto() == Voto.VotoEnum.SIM).count();
-        int nao = (int) votos.stream().filter(v -> v.getVoto() == Voto.VotoEnum.NAO).count();
-
-        LocalDateTime now = LocalDateTime.now();
-        String status = "SEM_SESSAO";
-
-        if (sessaoRepository.findActiveSessaoForPauta(pautaIdL, now).isPresent()) {
-            status = "ATIVA";
-        } else if (sessaoRepository.findByPautaId(pautaIdL).isPresent()) {
-            status = "EXPIRADA";
-        }
-
-        return ResultadoDTO.calcular(sim, nao, status);
+    public ResultadoDTO getResultado(Long pautaId) {
+        throw new UnsupportedOperationException("TODO: implement getResultado");
     }
 }
