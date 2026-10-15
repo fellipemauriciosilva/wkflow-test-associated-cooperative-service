@@ -31,21 +31,19 @@ public class VotoService {
     }
 
     @Transactional
-    public VotoDTO registrarVoto(Long pautaId, String associadoId, String votoStr) {
+    public VotoDTO registrarVoto(Long pautaIdL, String associadoId, String votoStr) {
         log.debug("Registrando voto");
 
         if (associadoId == null || associadoId.trim().isEmpty()) {
             throw new AssociadoInvalidoException("Associado invalido");
         }
 
-        try {
-            pautaRepository.getById(pautaId);
-        } catch (Exception e) {
+        if (!pautaRepository.existsById(Long.valueOf(pautaIdL))) {
             throw new PautaNotFoundException("Pauta nao encontrada");
         }
 
         LocalDateTime now = LocalDateTime.now();
-        Optional<Sessao> sessaoOpt = sessaoRepository.findActiveSessaoForPauta(pautaId, now);
+        Optional<Sessao> sessaoOpt = sessaoRepository.findActiveSessaoForPauta(pautaIdL, now);
         if (!sessaoOpt.isPresent()) {
             throw new SessaoNaoAtivaException("Sessao nao esta ativa");
         }
@@ -57,7 +55,7 @@ public class VotoService {
             throw new VotoInvalidoException("Voto invalido");
         }
 
-        Optional<Voto> existente = votoRepository.findByPautaIdAndAssociadoId(pautaId, associadoId);
+        Optional<Voto> existente = votoRepository.findByPautaIdAndAssociadoId(pautaIdL, associadoId);
         if (existente.isPresent()) {
             throw new VotoDuplicadoException("Voto duplicado");
         }
@@ -72,25 +70,23 @@ public class VotoService {
     }
 
     @Transactional(readOnly = true)
-    public ResultadoDTO getResultado(Long pautaId) {
+    public ResultadoDTO getResultado(Long pautaIdL) {
         log.debug("Obtendo resultado");
 
-        try {
-            pautaRepository.getById(pautaId);
-        } catch (Exception e) {
+        if (!pautaRepository.existsById(Long.valueOf(pautaIdL))) {
             throw new PautaNotFoundException("Pauta nao encontrada");
         }
 
-        List<Voto> votos = votoRepository.findByPautaId(pautaId);
+        List<Voto> votos = votoRepository.findByPautaId(pautaIdL);
         int sim = (int) votos.stream().filter(v -> v.getVoto() == Voto.VotoEnum.SIM).count();
         int nao = (int) votos.stream().filter(v -> v.getVoto() == Voto.VotoEnum.NAO).count();
 
         LocalDateTime now = LocalDateTime.now();
         String status = "SEM_SESSAO";
 
-        if (sessaoRepository.findActiveSessaoForPauta(pautaId, now).isPresent()) {
+        if (sessaoRepository.findActiveSessaoForPauta(pautaIdL, now).isPresent()) {
             status = "ATIVA";
-        } else if (sessaoRepository.findByPautaId(pautaId).isPresent()) {
+        } else if (sessaoRepository.findByPautaId(pautaIdL).isPresent()) {
             status = "EXPIRADA";
         }
 
