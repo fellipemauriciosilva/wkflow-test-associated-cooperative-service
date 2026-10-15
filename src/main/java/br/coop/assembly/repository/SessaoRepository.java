@@ -13,6 +13,6 @@ import java.util.Optional;
 public interface SessaoRepository extends JpaRepository<Sessao, Long> {
     Optional<Sessao> findByPautaId(Long pautaId);
 
-    @Query("SELECT s FROM Sessao s WHERE s.pautaId = :pautaId AND s.status = 'ATIVA' AND s.dataFim > :now")
-    Optional<Sessao> findActiveSessaoForPauta(@Param("pautaId") Long pautaId, @Param("now") LocalDateTime now);
+    @Query("SELECT s FROM Sessao s WHERE s.pautaId = ?1 AND s.status = 'ATIVA' AND s.dataFim > ?2")
+    Optional<Sessao> findActiveSessaoForPauta(Long pautaId, LocalDateTime now);
 }
