@@ -3,6 +3,8 @@ package br.coop.voting.shared.handler;
 import br.coop.voting.shared.exception.ErrorResponse;
 import br.coop.voting.shared.exception.PautaNaoEncontradaException;
 import br.coop.voting.domain.sessao.exception.SessaoAtivaException;
+import br.coop.voting.domain.voto.exception.VotacaoFechadaException;
+import br.coop.voting.domain.voto.exception.VotoDuplicadoException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -36,6 +38,26 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT)
             .body(ErrorResponse.builder()
                 .error("SessaoAtivaException")
+                .message(ex.getMessage())
+                .build());
+    }
+
+    @ExceptionHandler(VotacaoFechadaException.class)
+    public ResponseEntity<ErrorResponse> handleVotacaoFechada(VotacaoFechadaException ex) {
+        log.warn("Votação fechada: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            .body(ErrorResponse.builder()
+                .error("VotacaoFechadaException")
+                .message(ex.getMessage())
+                .build());
+    }
+
+    @ExceptionHandler(VotoDuplicadoException.class)
+    public ResponseEntity<ErrorResponse> handleVotoDuplicado(VotoDuplicadoException ex) {
+        log.warn("Voto duplicado: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(ErrorResponse.builder()
+                .error("VotoDuplicadoException")
                 .message(ex.getMessage())
                 .build());
     }

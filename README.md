@@ -1,6 +1,6 @@
-# Voting System - Slice 1 & 2: Gerenciamento de Pautas e Sessões
+# Voting System - Slices 1, 2 & 3: Pautas, Sessões e Votos
 
-Sistema de Votação em Assembleias de Cooperativa - Slice 1 implementa CRUD de pautas, Slice 2 implementa abertura/fechamento de sessões com expiração automática.
+Sistema de Votação em Assembleias de Cooperativa - Slice 1 implementa CRUD de pautas, Slice 2 implementa abertura/fechamento de sessões com expiração automática, Slice 3 implementa registro e consulta de votos com validações de duplicação.
 
 ## 📋 Requisitos
 
@@ -166,6 +166,76 @@ curl -X POST http://localhost:8080/pautas/1/sessao \
 
 ### Status da Sessão no GET /pautas
 GET /pautas/1 inclui `status_sessao`: `PAUTA_SEM_SESSAO|SESSAO_ABERTA|SESSAO_FECHADA`
+
+## 🗳️ Registro e Consulta de Votos (Slice 3)
+
+### Registrar um Voto
+
+```bash
+# Registrar voto SIM
+curl -X POST http://localhost:8080/pautas/1/votos \
+  -H 'Content-Type: application/json' \
+  -d '{"idAssociado":"A123","voto":"SIM"}' \
+  -v
+
+# Resposta (201 Created)
+{
+  "id": 1,
+  "pautaId": 1,
+  "idAssociado": "A123",
+  "voto": "SIM",
+  "createdAt": "2025-01-20T14:35:00"
+}
+
+# Registrar voto NAO
+curl -X POST http://localhost:8080/pautas/1/votos \
+  -H 'Content-Type: application/json' \
+  -d '{"idAssociado":"A456","voto":"NAO"}' \
+  -v
+```
+
+### Consultar Resultado de Votação
+
+```bash
+curl -X GET http://localhost:8080/pautas/1/resultado
+```
+
+**Resposta (200 OK)**:
+```json
+{
+  "pautaId": 1,
+  "sim": 1,
+  "nao": 1
+}
+```
+
+### Erros - Voto sem Sessão Aberta (400 Bad Request)
+
+```bash
+curl -X POST http://localhost:8080/pautas/2/votos \
+  -H 'Content-Type: application/json' \
+  -d '{"idAssociado":"A789","voto":"SIM"}'
+
+# Resposta
+{"error":"VotacaoFechadaException","message":"Votação não está aberta para a pauta 2"}
+```
+
+### Erros - Voto Duplicado (409 Conflict)
+
+```bash
+# Primeira tentativa (sucesso)
+curl -X POST http://localhost:8080/pautas/1/votos \
+  -H 'Content-Type: application/json' \
+  -d '{"idAssociado":"A123","voto":"SIM"}'
+
+# Segunda tentativa com mesmo associado (erro)
+curl -X POST http://localhost:8080/pautas/1/votos \
+  -H 'Content-Type: application/json' \
+  -d '{"idAssociado":"A123","voto":"NAO"}'
+
+# Resposta
+{"error":"VotoDuplicadoException","message":"Associado A123 já votou na pauta 1"}
+```
 
 ## ✅ Validações
 

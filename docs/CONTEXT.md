@@ -1,4 +1,4 @@
-# Contexto de Desenvolvimento - Slices 1 & 2
+# Contexto de Desenvolvimento - Slices 1, 2 & 3
 
 ## Módulos
 
@@ -22,14 +22,25 @@
 - `domain.sessao.exception.SessaoAtivaException`: 409 Conflict
 - `shared.handler.GlobalExceptionHandler`: Handlers para SessaoAtivaException (409), DataIntegrityViolationException (409), ConstraintViolationException (400)
 
+**Slice 3 - Votos (Completa)**
+- `domain.voto.entity.Voto`: JPA com id, pautaId (FK), sessaoId (FK), idAssociado, voto (enum SIM/NAO), createdAt + UNIQUE(pauta_id, id_associado)
+- `domain.voto.entity.VotoEnum`: Enum SIM, NAO
+- `domain.voto.repository.VotoRepository`: findByPautaIdAndIdAssociado(), countByPautaIdAndVoto()
+- `domain.voto.service.VotoService`: registrarVoto() com validações (pauta, sessão ativa, duplicação), consultarResultado()
+- `domain.voto.controller.VotoController`: POST /pautas/{id}/votos (201 Created), GET /pautas/{id}/resultado (200 OK)
+- `domain.voto.dto.*`: VotoRequestDTO (@NotBlank, @Pattern), VotoResponseDTO, VotoResultadoDTO
+- `domain.voto.exception.*`: VotacaoFechadaException (400), VotoDuplicadoException (409)
+- `shared.handler.GlobalExceptionHandler`: Handlers para VotacaoFechadaException (400), VotoDuplicadoException (409)
+
 ## Stack e comandos
 
 **Stack**: Spring Boot 3.3.3 + Spring Data JPA + H2 + JUnit 5 + Mockito + JaCoCo + @Scheduled
 
 ```bash
 mvnd clean compile          # Compilar
-mvnd test                   # Testes completos (63 testes: 36 Slice1 + 27 Slice2)
-mvnd test -Dtest='SessaoServiceTest'  # Apenas testes da Slice 2
+mvnd test                   # Testes completos (108 testes: 36 Slice1 + 27 Slice2 + 45 Slice3)
+mvnd test -Dtest='VotoControllerTest'  # Apenas testes da Slice 3
+mvnd jacoco:report         # Relatório de cobertura (target/site/jacoco/index.html)
 mvnd spring-boot:run       # Executar app em localhost:8080
 ```
 
@@ -61,6 +72,10 @@ mvnd spring-boot:run       # Executar app em localhost:8080
 13. **Pessimistic locking com flush()**: Previne race condition em abrirSessao(), converte constraint violation para 409
 14. **findLatestClosedByPautaId()**: Substitui findAll().stream() anti-pattern, evita memory exhaustion
 15. **Batch update em Java com findAllActiveSessions()**: Simples e idempotente vs. JPQL DATEADD
+16. **Voto como entidade JPA**: Garante persistência e constraint UNIQUE no banco
+17. **UNIQUE(pauta_id, id_associado)**: Impede duplicação no nível DB
+18. **Voto normaliza enum**: request.voto().toUpperCase() converte "sim" para "SIM"
+19. **VotoResultadoDTO com contagem**: Não persiste resultado, calcula em runtime
 
 ## Entregas
 
@@ -89,6 +104,21 @@ mvnd spring-boot:run       # Executar app em localhost:8080
 - [x] Logging INFO/WARN em operações críticas
 - [x] Cobertura JaCoCo >80%
 
+**Slice 3 - Registro e Consulta de Votos**: ✅ Completa
+- [x] Entidade Voto (id, pautaId FK, sessaoId FK, idAssociado, voto enum, createdAt)
+- [x] UNIQUE constraint (pauta_id, id_associado) no banco
+- [x] POST /pautas/{id}/votos com validação (idAssociado @NotBlank, voto @Pattern SIM|NAO)
+- [x] GET /pautas/{id}/resultado retorna {sim: N, nao: M}
+- [x] Validação: voto apenas com sessão aberta (400 VotacaoFechadaException)
+- [x] Validação: máx 1 voto por associado por pauta (409 VotoDuplicadoException)
+- [x] VotoService: registrarVoto() com validações, consultarResultado()
+- [x] DTOs segregadas: VotoRequestDTO, VotoResponseDTO, VotoResultadoDTO
+- [x] Exceções customizadas no GlobalExceptionHandler
+- [x] 45 testes (VotoControllerTest 11, VotoServiceTest 9, VotoRepositoryTest 8, VotoTest 3, VotoIntegrationTest 8 + outros)
+- [x] Logging INFO em registro de voto
+- [x] Transação @Transactional em VotoService
+- [x] Cobertura JaCoCo >80%
+
 ## Armadilhas
 
 1. **Query JPQL com DATEADD**: H2 não suporta em JPQL (✓ Solução: calcular em Java)
@@ -115,9 +145,9 @@ mvnd spring-boot:run       # Executar app em localhost:8080
 
 ## Pendências
 
-Nenhuma. Slices 1 e 2 estão 100% completas + todas as correções review aplicadas:
+Nenhuma. Slices 1, 2 e 3 estão 100% completas:
 - Build compila sem warnings
-- 63/63 testes passando (36 Slice1 + 27 Slice2)
-- Cobertura JaCoCo >80%
-- Todos os endpoints implementados (AC-1.1 a AC-1.10 + AC-2.1 a AC-2.20)
+- 108/108 testes passando (36 Slice1 + 27 Slice2 + 45 Slice3)
+- Cobertura JaCoCo >80% (todas as packages voto/*, pauta/*, sessao/*)
+- Todos os endpoints implementados (AC-1.1 a AC-1.10 + AC-2.1 a AC-2.20 + AC-3.1 a AC-3.7)
 - Documentação completa (README, CONTEXT.md)
