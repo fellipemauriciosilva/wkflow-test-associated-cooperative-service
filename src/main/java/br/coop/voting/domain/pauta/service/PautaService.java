@@ -89,9 +89,7 @@ public class PautaService {
                 .ativa(sessao.getAtiva())
                 .build();
         } else {
-            var sessaoFechada = sessaoRepository.findAll().stream()
-                .filter(s -> s.getPautaId().equals(pauta.getId()) && !s.getAtiva())
-                .findFirst();
+            var sessaoFechada = sessaoRepository.findLatestClosedByPautaId(pauta.getId());
             if (sessaoFechada.isPresent()) {
                 statusSessao = "SESSAO_FECHADA";
             }
