@@ -91,7 +91,16 @@ public class PautaService {
         } else {
             var sessaoFechada = sessaoRepository.findLatestClosedByPautaId(pauta.getId());
             if (sessaoFechada.isPresent()) {
+                var sessao = sessaoFechada.get();
                 statusSessao = "SESSAO_FECHADA";
+                sessaoResponse = br.coop.voting.domain.sessao.dto.SessaoResponse.builder()
+                    .id(sessao.getId())
+                    .pauta_id(sessao.getPautaId())
+                    .duracao_minutos(sessao.getDurationMinutes())
+                    .data_abertura(sessao.getDataAbertura())
+                    .data_fechamento(sessao.getDataFechamento())
+                    .ativa(sessao.getAtiva())
+                    .build();
             }
         }
 

@@ -117,12 +117,12 @@ class SessaoServiceTest {
         sessao2.setDataAbertura(LocalDateTime.now());
         sessao2.setDurationMinutes(60);
 
-        when(sessaoRepository.findByAtivaAndDataFechamentoNull()).thenReturn(List.of(sessao1, sessao2));
+        when(sessaoRepository.findAllActiveSessions()).thenReturn(List.of(sessao1, sessao2));
         when(sessaoRepository.save(any(Sessao.class))).thenAnswer(inv -> inv.getArgument(0));
 
         sessaoService.verificarExpiracoes();
 
-        verify(sessaoRepository).findByAtivaAndDataFechamentoNull();
+        verify(sessaoRepository).findAllActiveSessions();
         verify(sessaoRepository, times(1)).save(any(Sessao.class));
     }
 
