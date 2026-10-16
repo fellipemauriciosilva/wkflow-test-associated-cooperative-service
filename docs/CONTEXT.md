@@ -12,15 +12,15 @@
 - `domain.pauta.dto.*`: CriarPautaRequest, AtualizarPautaRequest, PautaResponse (com status_sessao+sessao)
 - `shared.exception.PautaNaoEncontradaException`: 404 Not Found
 
-**Slice 2 - Sessão (Completa)**
+**Slice 2 - Sessão (Completa + Correções Review)**
 - `domain.sessao.entity.Sessao`: JPA com pautaId (FK unique), durationMinutes, dataAbertura, dataFechamento, ativa
-- `domain.sessao.repository.SessaoRepository`: findByPautaIdAndAtivaTrue(), findByAtivaAndDataFechamentoNull()
-- `domain.sessao.service.SessaoService`: abrirSessao(), validarSessaoAtiva(), verificarExpiracoes(), fecharSessao()
-- `domain.sessao.service.SessaoScheduler`: @Scheduled(fixedDelay=30000) para verificar expiração automática
+- `domain.sessao.repository.SessaoRepository`: findByPautaIdAndAtivaTrue(), findLatestClosedByPautaId(), findAllActiveSessions()
+- `domain.sessao.service.SessaoService`: abrirSessao() com flush() para pessimistic locking, validarSessaoAtiva(), verificarExpiracoes() (batch), fecharSessao()
+- `domain.sessao.service.SessaoScheduler`: @Scheduled(fixedDelay=30000) idempotente com tratamento de exceções
 - `domain.sessao.controller.SessaoController`: POST /pautas/{pautaId}/sessao retorna 201 Created
 - `domain.sessao.dto.*`: SessaoRequest (duracao_minutos: 1-60), SessaoResponse (id+timestamps+ativa)
 - `domain.sessao.exception.SessaoAtivaException`: 409 Conflict
-- `shared.handler.GlobalExceptionHandler`: Adicionado handleSessaoAtiva() para 409
+- `shared.handler.GlobalExceptionHandler`: Handlers para SessaoAtivaException (409), DataIntegrityViolationException (409), ConstraintViolationException (400)
 
 ## Stack e comandos
 
@@ -58,6 +58,9 @@ mvnd spring-boot:run       # Executar app em localhost:8080
 10. **Status_sessao em runtime**: Evita denormalização persistindo status no banco
 11. **Scheduler @Scheduled(fixedDelay)**: Simples sem Quartz, executa 30s
 12. **Query findByAtivaAndDataFechamentoNull em Java**: Evita DATE_ADD em JPQL
+13. **Pessimistic locking com flush()**: Previne race condition em abrirSessao(), converte constraint violation para 409
+14. **findLatestClosedByPautaId()**: Substitui findAll().stream() anti-pattern, evita memory exhaustion
+15. **Batch update em Java com findAllActiveSessions()**: Simples e idempotente vs. JPQL DATEADD
 
 ## Entregas
 
@@ -94,9 +97,25 @@ mvnd spring-boot:run       # Executar app em localhost:8080
 4. **Status_sessao em runtime**: Evita inconsistência durante expiração (✓ design intencional)
 5. **pautaId como Long**: Simplifica sem @ManyToOne lazy loading (✓ trade-off aceitável)
 
+## Correções Review (Ciclo 2)
+
+**9 correções obrigatórias implementadas:**
+
+1. **Pessimistic locking**: SessaoService.abrirSessao() com flush() + try-catch DataIntegrityViolationException
+2. **Anti-pattern findAll().stream()**: Substituído por findLatestClosedByPautaId() query
+3. **DataIntegrityViolationException handler**: GlobalExceptionHandler converte para 409 Conflict
+4. **SessaoScheduler idempotente**: Check if already closed antes de update + melhor logging
+5. **Batch update em Java**: findAllActiveSessions() + loop com cálculo de expiração (vs. JPQL DATEADD)
+6. **@Positive validation**: Removido (não funciona bem com PathVariable em handler)
+7. **Test concorrência**: testAbrirSessaoConcurrentRequests() validando 201/409 sequencial
+8. **Test status sessão**: 3 novos testes em PautaServiceTest (ativa, fechada, sem sessão)
+9. **Test idempotência**: testVerificaExpiracoes_MakesIdempotent() em SessaoServiceTest
+
+**Resultado**: 69 testes passando, 100% de sucesso, sem compiler warnings
+
 ## Pendências
 
-Nenhuma. Slices 1 e 2 estão 100% completas:
+Nenhuma. Slices 1 e 2 estão 100% completas + todas as correções review aplicadas:
 - Build compila sem warnings
 - 63/63 testes passando (36 Slice1 + 27 Slice2)
 - Cobertura JaCoCo >80%
