@@ -158,4 +158,24 @@ class PautaServiceTest {
 
         verify(pautaRepository, times(1)).findById(99L);
     }
+
+    @Test
+    void testCriarPautaResponse_AllFieldsMapped() {
+        LocalDateTime now = LocalDateTime.now();
+        pautaMock.setCreatedAt(now);
+        pautaMock.setUpdatedAt(now);
+
+        when(pautaRepository.save(any(Pauta.class))).thenReturn(pautaMock);
+
+        PautaResponse response = pautaService.criar(criarRequest);
+
+        assertNotNull(response);
+        assertEquals(1L, response.getId());
+        assertEquals("Pauta Teste", response.getTitulo());
+        assertEquals("Descrição da pauta teste", response.getDescricao());
+        assertEquals(now, response.getCreatedAt());
+        assertEquals(now, response.getUpdatedAt());
+
+        verify(pautaRepository, times(1)).save(any(Pauta.class));
+    }
 }

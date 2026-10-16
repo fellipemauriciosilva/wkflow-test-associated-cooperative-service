@@ -1,5 +1,6 @@
 package br.coop.voting.domain.pauta.controller;
 
+import br.coop.voting.domain.pauta.dto.AtualizarPautaRequest;
 import br.coop.voting.domain.pauta.dto.PautaResponse;
 import br.coop.voting.domain.pauta.service.PautaService;
 import br.coop.voting.shared.exception.PautaNaoEncontradaException;
@@ -135,6 +136,40 @@ class PautaControllerTest {
     }
 
     @Test
+    void testCriarPautaComTituloExcedendo100Caracteres() throws Exception {
+        String tituloLongo = "A".repeat(101);
+        mockMvc.perform(post("/pautas")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                    new br.coop.voting.domain.pauta.dto.CriarPautaRequest(
+                        tituloLongo,
+                        "Descrição válida para teste"
+                    )
+                )))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error").value("Validação falhou"));
+
+        verify(pautaService, never()).criar(any());
+    }
+
+    @Test
+    void testCriarPautaComDescricaoExcedendo500Caracteres() throws Exception {
+        String descricaoLonga = "A".repeat(501);
+        mockMvc.perform(post("/pautas")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                    new br.coop.voting.domain.pauta.dto.CriarPautaRequest(
+                        "Pauta Teste",
+                        descricaoLonga
+                    )
+                )))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error").value("Validação falhou"));
+
+        verify(pautaService, never()).criar(any());
+    }
+
+    @Test
     void testObterPautaPorIdExistente() throws Exception {
         when(pautaService.obterPorId(1L)).thenReturn(pautaResponse);
 
@@ -196,6 +231,29 @@ class PautaControllerTest {
     }
 
     @Test
+    void testBuscarPautasComTituloEmBranco() throws Exception {
+        when(pautaService.listarTodas()).thenReturn(List.of(pautaResponse));
+
+        mockMvc.perform(get("/pautas?titulo="))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+
+        verify(pautaService, times(1)).listarTodas();
+        verify(pautaService, never()).buscarPorTitulo("");
+    }
+
+    @Test
+    void testBuscarPautasComTituloWhitespace() throws Exception {
+        when(pautaService.listarTodas()).thenReturn(List.of(pautaResponse));
+
+        mockMvc.perform(get("/pautas?titulo=   "))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+
+        verify(pautaService, times(1)).listarTodas();
+    }
+
+    @Test
     void testAtualizarPautaComDadosValidos() throws Exception {
         when(pautaService.atualizar(eq(1L), any())).thenReturn(pautaResponse);
 
@@ -254,5 +312,50 @@ class PautaControllerTest {
             .andExpect(jsonPath("$.error").value("Pauta não encontrada"));
 
         verify(pautaService, times(1)).deletar(99L);
+    }
+
+    @Test
+    void testAtualizarPautaComDescricaoMuitoCurta() throws Exception {
+        AtualizarPautaRequest request = new AtualizarPautaRequest(
+            "Pauta Atualizada",
+            "12345"
+        );
+
+        mockMvc.perform(put("/pautas/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error").value("Validação falhou"));
+
+        verify(pautaService, never()).atualizar(eq(1L), any());
+    }
+
+    @Test
+    void testAtualizarPautaComDescricaoExcedendo500Caracteres() throws Exception {
+        String descricaoLonga = "A".repeat(501);
+        AtualizarPautaRequest request = new AtualizarPautaRequest(
+            "Pauta Atualizada",
+            descricaoLonga
+        );
+
+        mockMvc.perform(put("/pautas/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error").value("Validação falhou"));
+
+        verify(pautaService, never()).atualizar(eq(1L), any());
+    }
+
+    @Test
+    void testUnexpectedRuntimeException_Returns500() throws Exception {
+        when(pautaService.obterPorId(any())).thenThrow(new RuntimeException("Erro inesperado"));
+
+        mockMvc.perform(get("/pautas/1"))
+            .andExpect(status().isInternalServerError())
+            .andExpect(jsonPath("$.error").value("Erro interno"))
+            .andExpect(jsonPath("$.message").value("Contacte suporte"));
+
+        verify(pautaService, times(1)).obterPorId(1L);
     }
 }
