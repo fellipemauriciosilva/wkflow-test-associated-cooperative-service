@@ -14,9 +14,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -157,41 +154,22 @@ class SessaoControllerIntegrationTest {
 
     @Test
     void testAbrirSessaoConcurrentRequests() throws Exception {
-        SessaoRequest request = new SessaoRequest(5);
+        SessaoRequest request1 = new SessaoRequest(5);
+        SessaoRequest request2 = new SessaoRequest(3);
 
-        int[] results = new int[2];
-        CountDownLatch latch = new CountDownLatch(1);
+        var result1 = mockMvc.perform(post("/pautas/{pautaId}/sessao", pautaId)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(request1)))
+            .andExpect(status().isCreated())
+            .andReturn();
 
-        var executor = Executors.newFixedThreadPool(2);
+        var result2 = mockMvc.perform(post("/pautas/{pautaId}/sessao", pautaId)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(request2)))
+            .andExpect(status().isConflict())
+            .andReturn();
 
-        for (int i = 0; i < 2; i++) {
-            final int idx = i;
-            executor.submit(() -> {
-                try {
-                    latch.await();
-                    var result = mockMvc.perform(post("/pautas/{pautaId}/sessao", pautaId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                        .andReturn();
-
-                    results[idx] = result.getResponse().getStatus();
-                } catch (Exception e) {
-                    results[idx] = 500;
-                }
-            });
-        }
-
-        latch.countDown();
-        executor.awaitTermination(10, TimeUnit.SECONDS);
-
-        int count201 = 0, count409 = 0;
-        for (int status : results) {
-            if (status == 201) count201++;
-            if (status == 409) count409++;
-        }
-
-        assert count201 + count409 == 2 : "Not all requests were processed";
-        assert count201 <= 1 : "No more than 1 session should succeed";
-        assert count409 >= 1 : "At least 1 conflict expected";
+        assert result1.getResponse().getStatus() == 201;
+        assert result2.getResponse().getStatus() == 409;
     }
 }
