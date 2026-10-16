@@ -133,6 +133,40 @@ curl -X PUT http://localhost:8080/pautas/1 \
 curl -X DELETE http://localhost:8080/pautas/1 -v
 ```
 
+## 🗳️ Sessão de Votação (Slice 2)
+
+### Abrir Sessão
+```bash
+curl -X POST http://localhost:8080/pautas/1/sessao \
+  -H 'Content-Type: application/json' \
+  -d '{"duracao_minutos":5}' \
+  -v
+```
+
+**Resposta (201 Created)**:
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "pauta_id": 1,
+  "duracao_minutos": 5,
+  "data_abertura": "2025-01-20T14:30:00",
+  "data_fechamento": null,
+  "ativa": true
+}
+```
+
+### Tentar Abrir 2ª Sessão (409 Conflict)
+```bash
+curl -X POST http://localhost:8080/pautas/1/sessao \
+  -H 'Content-Type: application/json' \
+  -d '{"duracao_minutos":2}'
+```
+
+**Resposta**: `{"error": "SessaoAtivaException", "message": "Pauta 1 já possui sessão ativa"}`
+
+### Status da Sessão no GET /pautas
+GET /pautas/1 inclui `status_sessao`: `PAUTA_SEM_SESSAO|SESSAO_ABERTA|SESSAO_FECHADA`
+
 ## ✅ Validações
 
 As pautas devem seguir as regras de validação:
@@ -141,6 +175,7 @@ As pautas devem seguir as regras de validação:
 |-------|-----------|----------|
 | titulo | @NotBlank, @Size(3-100) | "Título não pode ser vazio" / "Título deve ter entre 3 e 100 caracteres" |
 | descricao | @NotBlank, @Size(10-500) | "Descrição não pode ser vazia" / "Descrição deve ter entre 10 e 500 caracteres" |
+| duracao_minutos | @NotNull, @Min(1), @Max(60) | "Duração não pode ser nula" / "Duração deve estar entre 1 e 60 minutos" |
 
 ### Exemplo de erro (400 Bad Request):
 ```bash
@@ -248,7 +283,8 @@ src/test/java/br/coop/voting/
 
 ---
 
-**Status**: ✅ Slice 1 Completa | ✅ Slice 2 Completa  
+**Status**: ✅ Slice 1 Completa | ✅ Slice 2 Completa + Correções Review  
 **Cobertura**: JaCoCo > 80%  
-**Testes**: 63/63 passando (36 pauta + 27 sessão)  
-**Build**: ✅ Sucesso
+**Testes**: 69/69 passando (36 pauta + 27 sessão + 6 novos testes correção)  
+**Correções Review**: 9/9 implementadas (pessimistic locking, anti-patterns, batch update, idempotência, validações)  
+**Build**: ✅ Sucesso | ✅ 0 Warnings
