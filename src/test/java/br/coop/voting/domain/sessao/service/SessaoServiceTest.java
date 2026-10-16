@@ -145,4 +145,38 @@ class SessaoServiceTest {
             sessaoService.validarSessaoAtiva(pautaId)
         );
     }
+
+    @Test
+    void testVerificaExpiracoes_MakesIdempotent() {
+        var sessao = new Sessao();
+        sessao.setId("sessao-1");
+        sessao.setAtiva(true);
+        sessao.setDataAbertura(LocalDateTime.now().minusMinutes(65));
+        sessao.setDurationMinutes(1);
+
+        when(sessaoRepository.findAllActiveSessions()).thenReturn(List.of(sessao));
+        when(sessaoRepository.save(any(Sessao.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        sessaoService.verificarExpiracoes();
+        sessaoService.verificarExpiracoes();
+
+        verify(sessaoRepository, times(2)).findAllActiveSessions();
+    }
+
+    @Test
+    void testVerificaExpiracoes_UpdatesExpiredSessions() {
+        var sessao = new Sessao();
+        sessao.setId("sessao-1");
+        sessao.setAtiva(true);
+        sessao.setDataAbertura(LocalDateTime.now().minusMinutes(65));
+        sessao.setDurationMinutes(1);
+
+        when(sessaoRepository.findAllActiveSessions()).thenReturn(List.of(sessao));
+        when(sessaoRepository.save(any(Sessao.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        sessaoService.verificarExpiracoes();
+
+        verify(sessaoRepository).findAllActiveSessions();
+        verify(sessaoRepository).save(any(Sessao.class));
+    }
 }

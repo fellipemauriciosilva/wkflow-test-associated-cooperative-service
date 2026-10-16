@@ -14,6 +14,11 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.concurrent.AtomicInteger;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -149,5 +154,44 @@ class SessaoControllerIntegrationTest {
             .andExpect(status().isCreated())
             .andExpect(header().exists("Location"))
             .andExpect(header().string("Location", containsString("/pautas/" + pautaId + "/sessao/")));
+    }
+
+    @Test
+    void testAbrirSessaoConcurrentRequests() throws Exception {
+        SessaoRequest request = new SessaoRequest(5);
+
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicInteger conflictCount = new AtomicInteger(0);
+        AtomicInteger successCount = new AtomicInteger(0);
+
+        var executor = Executors.newFixedThreadPool(2);
+
+        for (int i = 0; i < 2; i++) {
+            executor.submit(() -> {
+                try {
+                    latch.await();
+                    var result = mockMvc.perform(post("/pautas/{pautaId}/sessao", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                        .andReturn();
+
+                    if (result.getResponse().getStatus() == 201) {
+                        successCount.incrementAndGet();
+                    } else if (result.getResponse().getStatus() == 409) {
+                        conflictCount.incrementAndGet();
+                    }
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        }
+
+        latch.countDown();
+        executor.awaitTermination(10, TimeUnit.SECONDS);
+
+        int total = successCount.get() + conflictCount.get();
+        assert total == 2;
+        assert successCount.get() <= 1;
+        assert conflictCount.get() >= 1;
     }
 }

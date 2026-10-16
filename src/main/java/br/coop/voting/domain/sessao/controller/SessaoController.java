@@ -4,6 +4,7 @@ import br.coop.voting.domain.sessao.dto.SessaoRequest;
 import br.coop.voting.domain.sessao.dto.SessaoResponse;
 import br.coop.voting.domain.sessao.service.SessaoService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,7 +22,7 @@ public class SessaoController {
 
     @PostMapping
     public ResponseEntity<SessaoResponse> abrirSessao(
-        @PathVariable Long pautaId,
+        @PathVariable @Positive Long pautaId,
         @RequestBody @Valid SessaoRequest request
     ) {
         SessaoResponse response = sessaoService.abrirSessao(pautaId, request);

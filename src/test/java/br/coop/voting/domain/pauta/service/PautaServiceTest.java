@@ -167,6 +167,60 @@ class PautaServiceTest {
     }
 
     @Test
+    void testObterPautaRetornaSessaoAtiva() {
+        var sessaoMock = new br.coop.voting.domain.sessao.entity.Sessao();
+        sessaoMock.setId("session-1");
+        sessaoMock.setPautaId(1L);
+        sessaoMock.setAtiva(true);
+        sessaoMock.setDurationMinutes(5);
+
+        when(pautaRepository.findById(1L)).thenReturn(Optional.of(pautaMock));
+        when(sessaoRepository.findByPautaIdAndAtivaTrue(1L)).thenReturn(Optional.of(sessaoMock));
+        lenient().when(sessaoRepository.findLatestClosedByPautaId(1L)).thenReturn(Optional.empty());
+
+        var response = pautaService.obterPorId(1L);
+
+        org.junit.jupiter.api.Assertions.assertNotNull(response);
+        org.junit.jupiter.api.Assertions.assertEquals("SESSAO_ABERTA", response.getStatus_sessao());
+        org.junit.jupiter.api.Assertions.assertNotNull(response.getSessao());
+        org.junit.jupiter.api.Assertions.assertTrue(response.getSessao().getAtiva());
+    }
+
+    @Test
+    void testObterPautaRetornaSessaoFechada() {
+        var sessaoMock = new br.coop.voting.domain.sessao.entity.Sessao();
+        sessaoMock.setId("session-1");
+        sessaoMock.setPautaId(1L);
+        sessaoMock.setAtiva(false);
+        sessaoMock.setDurationMinutes(5);
+        sessaoMock.setDataFechamento(LocalDateTime.now());
+
+        when(pautaRepository.findById(1L)).thenReturn(Optional.of(pautaMock));
+        when(sessaoRepository.findByPautaIdAndAtivaTrue(1L)).thenReturn(Optional.empty());
+        when(sessaoRepository.findLatestClosedByPautaId(1L)).thenReturn(Optional.of(sessaoMock));
+
+        var response = pautaService.obterPorId(1L);
+
+        org.junit.jupiter.api.Assertions.assertNotNull(response);
+        org.junit.jupiter.api.Assertions.assertEquals("SESSAO_FECHADA", response.getStatus_sessao());
+        org.junit.jupiter.api.Assertions.assertNotNull(response.getSessao());
+        org.junit.jupiter.api.Assertions.assertFalse(response.getSessao().getAtiva());
+    }
+
+    @Test
+    void testObterPautaRetornaSemSessao() {
+        when(pautaRepository.findById(1L)).thenReturn(Optional.of(pautaMock));
+        when(sessaoRepository.findByPautaIdAndAtivaTrue(1L)).thenReturn(Optional.empty());
+        when(sessaoRepository.findLatestClosedByPautaId(1L)).thenReturn(Optional.empty());
+
+        var response = pautaService.obterPorId(1L);
+
+        org.junit.jupiter.api.Assertions.assertNotNull(response);
+        org.junit.jupiter.api.Assertions.assertEquals("PAUTA_SEM_SESSAO", response.getStatus_sessao());
+        org.junit.jupiter.api.Assertions.assertNull(response.getSessao());
+    }
+
+    @Test
     void testCriarPautaResponse_AllFieldsMapped() {
         LocalDateTime now = LocalDateTime.now();
         pautaMock.setCreatedAt(now);

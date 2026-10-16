@@ -4,6 +4,7 @@ import br.coop.voting.shared.exception.ErrorResponse;
 import br.coop.voting.shared.exception.PautaNaoEncontradaException;
 import br.coop.voting.domain.sessao.exception.SessaoAtivaException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -34,6 +35,16 @@ public class GlobalExceptionHandler {
             .body(ErrorResponse.builder()
                 .error("SessaoAtivaException")
                 .message(ex.getMessage())
+                .build());
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        log.warn("Violação de constraint: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(ErrorResponse.builder()
+                .error("Conflito de dados")
+                .message("Operação viola restrição de unicidade")
                 .build());
     }
 

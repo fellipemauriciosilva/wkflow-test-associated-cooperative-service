@@ -8,6 +8,7 @@ import br.coop.voting.domain.sessao.exception.SessaoAtivaException;
 import br.coop.voting.domain.sessao.repository.SessaoRepository;
 import br.coop.voting.shared.exception.PautaNaoEncontradaException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,10 +40,15 @@ public class SessaoService {
         sessao.setDurationMinutes(request.duracao_minutos());
         sessao.setAtiva(true);
 
-        Sessao saved = sessaoRepository.save(sessao);
-        log.info("Abrindo sessão para pauta {} com duração {} minutos", pautaId, request.duracao_minutos());
-
-        return mapToResponse(saved);
+        try {
+            Sessao saved = sessaoRepository.save(sessao);
+            sessaoRepository.flush();
+            log.info("Abrindo sessão para pauta {} com duração {} minutos", pautaId, request.duracao_minutos());
+            return mapToResponse(saved);
+        } catch (DataIntegrityViolationException e) {
+            log.warn("Conflito: pauta {} já possui sessão ativa (constraint violation)", pautaId);
+            throw new SessaoAtivaException(pautaId);
+        }
     }
 
     public void validarSessaoAtiva(Long pautaId) {
@@ -53,19 +59,24 @@ public class SessaoService {
     }
 
     public void verificarExpiracoes() {
-        List<Sessao> sessoes = sessaoRepository.findByAtivaAndDataFechamentoNull();
         LocalDateTime agora = LocalDateTime.now();
+        var activeSessionsToCheck = sessaoRepository.findAllActiveSessions();
 
-        sessoes.stream()
-            .filter(s -> agora.isAfter(s.getDataAbertura().plusMinutes(s.getDurationMinutes())))
-            .forEach(this::fecharSessao);
+        for (Sessao sessao : activeSessionsToCheck) {
+            LocalDateTime expirationTime = sessao.getDataAbertura().plusMinutes(sessao.getDurationMinutes());
+            if (agora.isAfter(expirationTime)) {
+                fecharSessao(sessao);
+            }
+        }
     }
 
     private void fecharSessao(Sessao sessao) {
-        sessao.setAtiva(false);
-        sessao.setDataFechamento(LocalDateTime.now());
-        sessaoRepository.save(sessao);
-        log.info("Sessão {} expirada, fechando", sessao.getId());
+        if (sessao.getAtiva() && sessao.getDataFechamento() == null) {
+            sessao.setAtiva(false);
+            sessao.setDataFechamento(LocalDateTime.now());
+            sessaoRepository.save(sessao);
+            log.info("Sessão {} expirada, fechando", sessao.getId());
+        }
     }
 
     private SessaoResponse mapToResponse(Sessao sessao) {
