@@ -14,7 +14,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.concurrent.AtomicInteger;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -160,13 +159,13 @@ class SessaoControllerIntegrationTest {
     void testAbrirSessaoConcurrentRequests() throws Exception {
         SessaoRequest request = new SessaoRequest(5);
 
+        int[] results = new int[2];
         CountDownLatch latch = new CountDownLatch(1);
-        AtomicInteger conflictCount = new AtomicInteger(0);
-        AtomicInteger successCount = new AtomicInteger(0);
 
         var executor = Executors.newFixedThreadPool(2);
 
         for (int i = 0; i < 2; i++) {
+            final int idx = i;
             executor.submit(() -> {
                 try {
                     latch.await();
@@ -175,13 +174,9 @@ class SessaoControllerIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                         .andReturn();
 
-                    if (result.getResponse().getStatus() == 201) {
-                        successCount.incrementAndGet();
-                    } else if (result.getResponse().getStatus() == 409) {
-                        conflictCount.incrementAndGet();
-                    }
+                    results[idx] = result.getResponse().getStatus();
                 } catch (Exception e) {
-                    throw new RuntimeException(e);
+                    results[idx] = 500;
                 }
             });
         }
@@ -189,9 +184,14 @@ class SessaoControllerIntegrationTest {
         latch.countDown();
         executor.awaitTermination(10, TimeUnit.SECONDS);
 
-        int total = successCount.get() + conflictCount.get();
-        assert total == 2;
-        assert successCount.get() <= 1;
-        assert conflictCount.get() >= 1;
+        int count201 = 0, count409 = 0;
+        for (int status : results) {
+            if (status == 201) count201++;
+            if (status == 409) count409++;
+        }
+
+        assert count201 + count409 == 2 : "Not all requests were processed";
+        assert count201 <= 1 : "No more than 1 session should succeed";
+        assert count409 >= 1 : "At least 1 conflict expected";
     }
 }
