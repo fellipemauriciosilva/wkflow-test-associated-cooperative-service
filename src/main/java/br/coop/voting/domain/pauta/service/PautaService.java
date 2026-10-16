@@ -5,6 +5,7 @@ import br.coop.voting.domain.pauta.dto.CriarPautaRequest;
 import br.coop.voting.domain.pauta.dto.PautaResponse;
 import br.coop.voting.domain.pauta.entity.Pauta;
 import br.coop.voting.domain.pauta.repository.PautaRepository;
+import br.coop.voting.domain.sessao.repository.SessaoRepository;
 import br.coop.voting.shared.exception.PautaNaoEncontradaException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +21,9 @@ public class PautaService {
 
     @Autowired
     private PautaRepository pautaRepository;
+
+    @Autowired
+    private SessaoRepository sessaoRepository;
 
     public PautaResponse criar(CriarPautaRequest request) {
         Pauta pauta = new Pauta();
@@ -69,10 +73,36 @@ public class PautaService {
     }
 
     private PautaResponse toPautaResponse(Pauta pauta) {
+        var sessaoAtiva = sessaoRepository.findByPautaIdAndAtivaTrue(pauta.getId());
+        String statusSessao = "PAUTA_SEM_SESSAO";
+        br.coop.voting.domain.sessao.dto.SessaoResponse sessaoResponse = null;
+
+        if (sessaoAtiva.isPresent()) {
+            var sessao = sessaoAtiva.get();
+            statusSessao = "SESSAO_ABERTA";
+            sessaoResponse = br.coop.voting.domain.sessao.dto.SessaoResponse.builder()
+                .id(sessao.getId())
+                .pauta_id(sessao.getPautaId())
+                .duracao_minutos(sessao.getDurationMinutes())
+                .data_abertura(sessao.getDataAbertura())
+                .data_fechamento(sessao.getDataFechamento())
+                .ativa(sessao.getAtiva())
+                .build();
+        } else {
+            var sessaoFechada = sessaoRepository.findAll().stream()
+                .filter(s -> s.getPautaId().equals(pauta.getId()) && !s.getAtiva())
+                .findFirst();
+            if (sessaoFechada.isPresent()) {
+                statusSessao = "SESSAO_FECHADA";
+            }
+        }
+
         return PautaResponse.builder()
             .id(pauta.getId())
             .titulo(pauta.getTitulo())
             .descricao(pauta.getDescricao())
+            .status_sessao(statusSessao)
+            .sessao(sessaoResponse)
             .createdAt(pauta.getCreatedAt())
             .updatedAt(pauta.getUpdatedAt())
             .build();

@@ -5,6 +5,7 @@ import br.coop.voting.domain.pauta.dto.CriarPautaRequest;
 import br.coop.voting.domain.pauta.dto.PautaResponse;
 import br.coop.voting.domain.pauta.entity.Pauta;
 import br.coop.voting.domain.pauta.repository.PautaRepository;
+import br.coop.voting.domain.sessao.repository.SessaoRepository;
 import br.coop.voting.shared.exception.PautaNaoEncontradaException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,9 @@ class PautaServiceTest {
     @Mock
     private PautaRepository pautaRepository;
 
+    @Mock
+    private SessaoRepository sessaoRepository;
+
     @InjectMocks
     private PautaService pautaService;
 
@@ -43,6 +47,9 @@ class PautaServiceTest {
         pautaMock.setUpdatedAt(LocalDateTime.now());
 
         criarRequest = new CriarPautaRequest("Pauta Teste", "Descrição da pauta teste");
+
+        lenient().when(sessaoRepository.findByPautaIdAndAtivaTrue(any())).thenReturn(Optional.empty());
+        lenient().when(sessaoRepository.findAll()).thenReturn(List.of());
     }
 
     @Test

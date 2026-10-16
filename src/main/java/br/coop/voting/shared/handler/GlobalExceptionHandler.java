@@ -2,6 +2,7 @@ package br.coop.voting.shared.handler;
 
 import br.coop.voting.shared.exception.ErrorResponse;
 import br.coop.voting.shared.exception.PautaNaoEncontradaException;
+import br.coop.voting.domain.sessao.exception.SessaoAtivaException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +23,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
             .body(ErrorResponse.builder()
                 .error("Pauta não encontrada")
+                .message(ex.getMessage())
+                .build());
+    }
+
+    @ExceptionHandler(SessaoAtivaException.class)
+    public ResponseEntity<ErrorResponse> handleSessaoAtiva(SessaoAtivaException ex) {
+        log.warn("Sessão ativa: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(ErrorResponse.builder()
+                .error("SessaoAtivaException")
                 .message(ex.getMessage())
                 .build());
     }

@@ -34,4 +34,8 @@ public class Pauta {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    public String getStatusSessao() {
+        return "PAUTA_SEM_SESSAO";
+    }
 }
