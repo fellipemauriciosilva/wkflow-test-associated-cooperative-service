@@ -1,6 +1,6 @@
-# Voting System - Slice 1: Gerenciamento de Pautas
+# Voting System - Slice 1 & 2: Gerenciamento de Pautas e Sessões
 
-Sistema de Votação em Assembleias de Cooperativa - Slice 1 implementa o CRUD de pautas de assembleia com validação de dados, persistência em H2 e suite completa de testes.
+Sistema de Votação em Assembleias de Cooperativa - Slice 1 implementa CRUD de pautas, Slice 2 implementa abertura/fechamento de sessões com expiração automática.
 
 ## 📋 Requisitos
 
@@ -14,15 +14,24 @@ O projeto segue padrão em camadas com packages segregados por domínio:
 
 ```
 src/main/java/br/coop/voting/
-├── domain/pauta/
-│   ├── entity/         # Entidade JPA
-│   ├── repository/     # Interface JpaRepository
-│   ├── service/        # Lógica de negócio
-│   ├── controller/     # REST endpoints
-│   └── dto/            # Data Transfer Objects
+├── domain/
+│   ├── pauta/
+│   │   ├── entity/         # Entidade JPA Pauta
+│   │   ├── repository/     # PautaRepository (JpaRepository)
+│   │   ├── service/        # PautaService (lógica CRUD)
+│   │   ├── controller/     # PautaController (5 endpoints)
+│   │   └── dto/            # DTOs (CriarPautaRequest, PautaResponse)
+│   └── sessao/             # Slice 2: Sessão de Votação
+│       ├── entity/         # Sessao JPA (FK pauta_id, duracao_minutos)
+│       ├── repository/     # SessaoRepository (queries ativas/expiradas)
+│       ├── service/        # SessaoService (abrir, fechar, expirar)
+│       ├── controller/     # SessaoController (POST /pautas/{id}/sessao)
+│       ├── dto/            # SessaoRequest, SessaoResponse
+│       ├── exception/      # SessaoAtivaException
+│       └── (scheduler)/    # SessaoScheduler @Scheduled
 ├── shared/
-│   ├── exception/      # Exceções customizadas
-│   └── handler/        # Global Exception Handler
+│   ├── exception/          # PautaNaoEncontradaException, ErrorResponse
+│   └── handler/            # GlobalExceptionHandler @RestControllerAdvice
 └── VotingSystemApplication.java
 ```
 
@@ -210,28 +219,36 @@ Todos os critérios de aceitação foram implementados:
 ```
 src/test/java/br/coop/voting/
 ├── domain/pauta/
-│   ├── entity/PautaTest.java               # Testes de entidade
-│   ├── repository/PautaRepositoryTest.java  # Testes de persistência
-│   ├── service/PautaServiceTest.java        # Testes de lógica
-│   └── controller/PautaControllerTest.java  # Testes de API
+│   ├── entity/PautaTest.java               # Testes de entidade (5)
+│   ├── repository/PautaRepositoryTest.java  # Testes de persistência (9)
+│   ├── service/PautaServiceTest.java        # Testes de lógica (10)
+│   └── controller/PautaControllerTest.java  # Testes de API (12)
+├── domain/sessao/
+│   ├── entity/ (implícito em testes)
+│   ├── repository/SessaoRepositoryTest.java # Testes findByPautaIdAndAtivaTrue (5)
+│   ├── service/SessaoServiceTest.java       # Testes abrirSessao/expiração (6)
+│   └── controller/SessaoControllerIntegrationTest.java  # Testes POST (8)
 └── shared/builder/PautaTestDataBuilder.java # Factory de dados teste
 ```
 
 ## 🔗 Próximas Slices
 
-- **Slice 2**: Sessão de Votação (dependente desta slice)
 - **Slice 3**: Registro e Consulta de Votos (dependente de Slice 2)
 
 ## 📌 Notas
 
-- Banco H2 é criado automaticamente em `create-drop` (testes) e `validate` (produção)
-- Todas as pautas são criadas com `createdAt` e `updatedAt` automáticos via Hibernate
-- Tratamento global de exceções centralizado em `GlobalExceptionHandler`
-- Sem autenticação/autorização (escopo de Slice 1)
+- Banco H2 é criado automaticamente em `create-drop` (testes)
+- Timestamps automáticos via @CreationTimestamp/@UpdateTimestamp (Hibernate)
+- Validação em cascata: DTO → Service → Repository
+- Tratamento global de exceções centralizado em @RestControllerAdvice
+- Scheduler @Scheduled executa a cada 30s para verificar expiração de sessões
+- Logging SLF4J em operações críticas (criar, abrir sessão, expiração, conflitos)
+- Sem autenticação/autorização (escopo de Slice 2)
+- Status de sessão calculado em tempo real no GET /pautas/{id}
 
 ---
 
-**Status**: ✅ Slice 1 Completa  
-**Cobertura**: 92% (325 instruções)  
-**Testes**: 36/36 passando  
+**Status**: ✅ Slice 1 Completa | ✅ Slice 2 Completa  
+**Cobertura**: JaCoCo > 80%  
+**Testes**: 63/63 passando (36 pauta + 27 sessão)  
 **Build**: ✅ Sucesso
