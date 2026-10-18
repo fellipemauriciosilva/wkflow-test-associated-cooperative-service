@@ -20,7 +20,7 @@ public class PautaService {
     @Transactional
     public Pauta create(String title) {
         Pauta pauta = new Pauta();
-        pauta.setTitle(title);
+        pauta.setTitle(title.trim());
         pauta.setCreatedAt(Instant.now());
         Pauta saved = pautaRepository.save(pauta);
         log.info("Pauta created with id {}", saved.getId());

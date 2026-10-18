@@ -5,6 +5,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -22,6 +23,7 @@ public class Pauta {
     private Long id;
 
     @NotBlank(message = "title must not be blank")
+    @Size(min = 1, max = 255, message = "title must be between 1 and 255 characters")
     private String title;
 
     private Instant createdAt;
