@@ -13,6 +13,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.Optional;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -72,11 +73,19 @@ public class VotoService {
     }
 
     private boolean violaConstraintDeVotoUnico(DataIntegrityViolationException ex) {
+        Throwable causa = ex.getCause();
+        if (causa instanceof ConstraintViolationException constraintViolationException) {
+            String nomeConstraint = constraintViolationException.getConstraintName();
+            if (nomeConstraint != null) {
+                return nomeConstraint.equalsIgnoreCase(Voto.UK_PAUTA_ASSOCIADO);
+            }
+        }
+
         String mensagem = String.valueOf(ex.getMostSpecificCause().getMessage()).toLowerCase(Locale.ROOT);
         boolean nomeDaConstraint = mensagem.contains(Voto.UK_PAUTA_ASSOCIADO.toLowerCase(Locale.ROOT));
-        boolean tabelaEColunas = mensagem.contains("voto")
+        boolean indiceAutogeradoComColunas = mensagem.contains("constraint_index")
                 && mensagem.contains("pauta_id")
                 && mensagem.contains("id_associado");
-        return nomeDaConstraint || tabelaEColunas;
+        return nomeDaConstraint || indiceAutogeradoComColunas;
     }
 }

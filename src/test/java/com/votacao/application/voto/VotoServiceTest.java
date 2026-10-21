@@ -166,4 +166,43 @@ class VotoServiceTest {
                 .isInstanceOf(DataIntegrityViolationException.class)
                 .isNotInstanceOf(VotoDuplicadoException.class);
     }
+
+    @Test
+    @DisplayName("registrar violação com índice autogerado do H2 (CONSTRAINT_INDEX_N) sobre pauta_id/id_associado deve "
+            + "lançar VotoDuplicadoException")
+    void registrar_violacaoConstraintIndiceAutogerado_lancaVotoDuplicadoException() {
+        Pauta pauta = new Pauta("Título", "Descrição");
+        Sessao sessao = sessaoAberta(pauta);
+        when(pautaService.buscarPorId(1L)).thenReturn(pauta);
+        when(sessaoRepository.findByPautaId(1L)).thenReturn(Optional.of(sessao));
+        when(votoRepository.existsByPautaIdAndIdAssociado(1L, 10L)).thenReturn(false);
+        DataIntegrityViolationException excecaoIndiceAutogerado = new DataIntegrityViolationException(
+                "could not execute statement",
+                new RuntimeException("Unique index or primary key violation: "
+                        + "\"CONSTRAINT_INDEX_9 ON PUBLIC.VOTO(PAUTA_ID, ID_ASSOCIADO) VALUES ( /* 1 */ 1, 10 )\""));
+        when(votoRepository.save(any(Voto.class))).thenThrow(excecaoIndiceAutogerado);
+
+        assertThatThrownBy(() -> sut.registrar(1L, 10L, TipoVoto.SIM))
+                .isInstanceOf(VotoDuplicadoException.class);
+    }
+
+    @Test
+    @DisplayName("registrar violação na tabela voto com colunas diferentes do índice autogerado deve relançar "
+            + "exceção original")
+    void registrar_violacaoConstraintIndiceAutogeradoColunasDiferentes_relancaExcecaoOriginal() {
+        Pauta pauta = new Pauta("Título", "Descrição");
+        Sessao sessao = sessaoAberta(pauta);
+        when(pautaService.buscarPorId(1L)).thenReturn(pauta);
+        when(sessaoRepository.findByPautaId(1L)).thenReturn(Optional.of(sessao));
+        when(votoRepository.existsByPautaIdAndIdAssociado(1L, 10L)).thenReturn(false);
+        DataIntegrityViolationException excecaoColunasDiferentes = new DataIntegrityViolationException(
+                "could not execute statement",
+                new RuntimeException("Unique index or primary key violation: "
+                        + "\"CONSTRAINT_INDEX_3 ON PUBLIC.VOTO(OUTRA_COLUNA) VALUES ( /* 1 */ 1 )\""));
+        when(votoRepository.save(any(Voto.class))).thenThrow(excecaoColunasDiferentes);
+
+        assertThatThrownBy(() -> sut.registrar(1L, 10L, TipoVoto.SIM))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .isNotInstanceOf(VotoDuplicadoException.class);
+    }
 }

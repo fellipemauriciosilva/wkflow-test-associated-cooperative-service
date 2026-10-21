@@ -117,6 +117,30 @@ class VotoControllerTest {
                 .andExpect(jsonPath("$.error").exists());
     }
 
+    @Test
+    void registrarVoto_semIdAssociado_retorna400() throws Exception {
+        Long pautaId = criarPauta("Pauta Voto F");
+        abrirSessao(pautaId, 5);
+
+        mockMvc.perform(post("/pautas/{id}/votos", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"voto\":\"SIM\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").exists());
+    }
+
+    @Test
+    void registrarVoto_idAssociadoNaoPositivo_retorna400() throws Exception {
+        Long pautaId = criarPauta("Pauta Voto G");
+        abrirSessao(pautaId, 5);
+
+        mockMvc.perform(post("/pautas/{id}/votos", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"id_associado\":0,\"voto\":\"SIM\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").exists());
+    }
+
     private record PautaRequestFixture(String titulo, String descricao) {
     }
 }

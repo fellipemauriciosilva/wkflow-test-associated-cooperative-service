@@ -90,12 +90,19 @@ sobre slice 1 já mergeada (ciclo de correção de review aplicado).
   afirmando exatamente um 201 e os demais 422.
 - Voto segue o mesmo padrão de dupla barreira: check `existsByPautaIdAndIdAssociado` no
   `VotoService` (rejeita cedo com 409) + constraint única nomeada (`Voto.UK_PAUTA_ASSOCIADO` =
-  `uk_voto_pauta_associado`) em `(pauta_id, id_associado)`. `registrar()` é `@Transactional`. A
-  tradução de `DataIntegrityViolationException` usa o mesmo fallback por nome/tabela/coluna que
-  `SessaoService` — necessário porque, nesta sessão, o H2 reportou o índice como
-  `UK_VOTO_PAUTA_ASSOCIADO_INDEX_2` (sufixo autogerado), não o nome exato da constraint; o
-  fallback por `contains("voto") && contains("pauta_id") && contains("id_associado")` cobre esse
-  caso. Coberto por `VotoServiceTest` (cenário de violação não relacionada) e por
+  `uk_voto_pauta_associado`) em `(pauta_id, id_associado)`. `registrar()` é `@Transactional`.
+  A tradução de `DataIntegrityViolationException` tenta, em ordem: (1)
+  `org.hibernate.exception.ConstraintViolationException#getConstraintName()` via `getCause()`,
+  comparado com `Voto.UK_PAUTA_ASSOCIADO` via `equalsIgnoreCase` — caminho preferido, não depende
+  de parsing de mensagem; (2) fallback por mensagem só quando (1) não resolve (nome nulo ou causa
+  de outro tipo): nome da constraint em substring, OU token `CONSTRAINT_INDEX` + colunas
+  `pauta_id`/`id_associado` juntas (cobre o índice autogerado do H2, ex.:
+  `CONSTRAINT_INDEX_9 ON PUBLIC.VOTO(PAUTA_ID, ID_ASSOCIADO)`). O fallback não usa mais
+  `contains("voto")` isolado (achava qualquer mensagem citando a tabela, mascarando violação em
+  colunas diferentes). Coberto por `VotoServiceTest`: violação com nome exato da constraint,
+  violação com índice autogerado `CONSTRAINT_INDEX_N` sobre as colunas certas (ambas →
+  `VotoDuplicadoException`), violação não relacionada (`NULL not allowed`, relança) e violação na
+  tabela `voto` com `CONSTRAINT_INDEX` mas coluna diferente (relança). Também coberto por
   `VotoConcorrenciaIntegrationTest` (10 requisições concorrentes do mesmo associado/pauta,
   exatamente um 201 e os demais 409).
 - Ordem de validação em `VotoService.registrar` (primeira falha vence, conforme task.md):
@@ -141,21 +148,48 @@ sobre slice 1 já mergeada (ciclo de correção de review aplicado).
   controller; usar integração com servidor real quando o comportamento do prefixo importar.
 - Nomear `@UniqueConstraint` explicitamente nem sempre garante que o nome apareça na mensagem de
   erro do H2 (pode reportar um índice interno autogerado tipo `CONSTRAINT_INDEX_9`, confirmado
-  também para `Voto.UK_PAUTA_ASSOCIADO` nesta sessão). Detecção de "qual constraint violou" via
-  `getMostSpecificCause().getMessage()` deve sempre ter um fallback por tabela/coluna além do nome
-  — não confiar só no nome declarado da constraint ao adicionar novas entidades com unicidade.
+  também para `Voto.UK_PAUTA_ASSOCIADO` nesta sessão). Esse caso **não** é coberto pela checagem de
+  nome por substring (nem pelo nome real nem pelo `getConstraintName()` do Hibernate, que também
+  reporta o índice autogerado) — só o fallback por token `CONSTRAINT_INDEX` + colunas resolve.
+  Ao adicionar novas entidades com unicidade, preferir `ConstraintViolationException#getConstraintName()`
+  via causa como primeira tentativa, com fallback por tabela/coluna (exigindo `CONSTRAINT_INDEX`,
+  não só o nome da tabela — nome de tabela sozinho em mensagem de erro é frouxo demais e pode
+  mascarar violação em outra coluna da mesma tabela).
 
 ## Pendências
 
 - Limite superior para `duracao_minutos`: não implementado, não definido pelo épico. Confirmar
   com stakeholder antes do merge final (mencionado no `task.md` original como questão em aberto).
-- Sem autenticação/autorização: qualquer requisição cria pauta, abre sessão e vota em nome de
-  qualquer `id_associado` informado no payload (não validado contra identidade real). Avaliar
-  antes de produção; fora do escopo do slice 2 conforme MoSCoW (C2 "could").
+- **Decisão formal de risco aceito — identidade do voto sem autenticação (bloqueio de design
+  levantado em review de segurança, slice 2).** `id_associado` vem cru do payload, sem
+  autenticação: qualquer cliente pode votar em nome de qualquer associado, inclusive repetindo em
+  loop com IDs diferentes para forjar resultado. O review classificou isso como bloqueio de
+  design, não apenas débito técnico. Decisão tomada nesta sessão: **aceitar o risco para o slice 2
+  e não introduzir autenticação agora**, porque (a) não há entidade de associado nem mecanismo de
+  login no sistema ainda — adicionar auth exigiria escopo fora do slice (cadastro de associado,
+  emissão/validação de token, possivelmente sessão de usuário), o que o `task.md` do slice 2 não
+  cobre nem no MUST nem no COULD; (b) o épico mestre não definiu stakeholder/prazo para auth.
+  **Prazo:** antes de qualquer exposição do sistema fora de ambiente de teste/demo — deve ser
+  tratado como pré-requisito de produção, não tarefa opcional de slice futuro. Quem destravar o
+  cadastro de associados (pré-requisito técnico) deve também revisitar este item.
+  Mitigação parcial aplicada no slice 2: `@Positive` em `id_associado` rejeita `0`/negativo (não
+  resolve a falta de autenticação, só reduz ruído de entrada claramente inválida).
+- **Decisão: existência de voto (409) e distinção 404/422/409 tratadas como informação não
+  sensível neste slice.** Sem autenticação (item acima), o 409 de duplicata já revela se um dado
+  `id_associado` votou numa pauta para qualquer chamador — e 404/422/409 juntos permitem mapear
+  estado de pauta/sessão por tentativa. Decisão: manter os três códigos distintos por ora, porque
+  (a) sigilo de voto não está listado como requisito no `task.md` nem no épico mestre; (b) o
+  problema real é a ausência de autenticação, não o código de status — resolver só a enumeração
+  sem resolver identidade não impede o ataque de forjar voto, só esconde o sintoma. Tratar como
+  trade-off consciente até a decisão de auth acima ser resolvida; se sigilo de voto virar
+  requisito explícito, revisitar junto com autenticação (não isoladamente).
+- Sem autorização além do ponto acima: qualquer requisição cria pauta e abre sessão também sem
+  restrição de quem pode fazê-lo. Mesma pendência de auth, mesmo prazo.
 - `SessaoResponse.from` hardcoda `status = "ABERTA"`. Ok enquanto não existe fechamento de sessão;
   derivar do estado real (comparando `fechamento` com `now`) deve entrar no slice de resultado.
 - Slice 3 (resultado agregado, master AC não detalhado neste task.md): depende de `VotoRepository`
   para contagem de SIM/NAO por pauta — `Voto` e `TipoVoto` já atendem esse pré-requisito.
-- `VotoRequest` não valida se `id_associado` corresponde a um associado real (não há entidade de
-  associado no sistema ainda) — qualquer `Long` positivo ou negativo é aceito como válido pelo
-  Bean Validation (`@NotNull` apenas). Mencionar se slice futuro adicionar cadastro de associados.
+- `VotoRequest.idAssociado` agora rejeita não positivo (`@Positive`), mas não valida se
+  corresponde a um associado real (não há entidade de associado no sistema ainda). Mencionar se
+  slice futuro adicionar cadastro de associados — nesse ponto também revisitar a decisão de
+  autenticação acima.
