@@ -31,4 +31,6 @@ H2 em memória, schema recriado a cada subida (`ddl-auto=create-drop`). Sem pers
 - `GET /api/pautas/{id}` — consulta pauta por ID.
 - `POST /api/pautas/{id}/sessao` — abre sessão de votação. Body opcional: `{"duracao_minutos": N}` (padrão 1 minuto).
 
-Erros seguem o formato `{"error": "...", "timestamp": "...", "path": "..."}`.
+Erros seguem o formato `{"error": "...", "timestamp": "...", "path": "..."}` — inclusive para
+JSON malformado (400), parâmetro de caminho com tipo inválido (400), rota inexistente (404),
+método HTTP não suportado (405) e erro interno não previsto (500).
