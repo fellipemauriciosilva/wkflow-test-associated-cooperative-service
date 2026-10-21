@@ -76,8 +76,8 @@ public class VotoService {
         Throwable causa = ex.getCause();
         if (causa instanceof ConstraintViolationException constraintViolationException) {
             String nomeConstraint = constraintViolationException.getConstraintName();
-            if (nomeConstraint != null) {
-                return nomeConstraint.equalsIgnoreCase(Voto.UK_PAUTA_ASSOCIADO);
+            if (nomeConstraint != null && nomeConstraint.equalsIgnoreCase(Voto.UK_PAUTA_ASSOCIADO)) {
+                return true;
             }
         }
 
