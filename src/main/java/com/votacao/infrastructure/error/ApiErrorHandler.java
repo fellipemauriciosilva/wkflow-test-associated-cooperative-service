@@ -2,6 +2,8 @@ package com.votacao.infrastructure.error;
 
 import com.votacao.domain.pauta.PautaNotFoundException;
 import com.votacao.domain.sessao.SessaoJaAbertaException;
+import com.votacao.domain.voto.SessaoIndisponivelParaVotoException;
+import com.votacao.domain.voto.VotoDuplicadoException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import org.springframework.http.HttpStatus;
@@ -25,6 +27,17 @@ public class ApiErrorHandler {
 
     @ExceptionHandler(SessaoJaAbertaException.class)
     public ResponseEntity<ErrorResponse> handleSessaoJaAberta(SessaoJaAbertaException ex, HttpServletRequest request) {
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(VotoDuplicadoException.class)
+    public ResponseEntity<ErrorResponse> handleVotoDuplicado(VotoDuplicadoException ex, HttpServletRequest request) {
+        return build(HttpStatus.CONFLICT, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(SessaoIndisponivelParaVotoException.class)
+    public ResponseEntity<ErrorResponse> handleSessaoIndisponivelParaVoto(
+            SessaoIndisponivelParaVotoException ex, HttpServletRequest request) {
         return build(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), request);
     }
 

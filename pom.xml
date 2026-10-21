@@ -15,7 +15,7 @@
     <artifactId>votacao-api</artifactId>
     <version>0.1.0</version>
     <name>votacao-api</name>
-    <description>Pauta management and voting session API - slice 1</description>
+    <description>Pauta management and voting session API - slices 1 and 2</description>
 
     <properties>
         <java.version>21</java.version>
