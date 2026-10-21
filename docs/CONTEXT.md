@@ -1,150 +1,150 @@
 # Contexto do projeto — votacao-api
 
-Épico: H90-15-EPICO / run_bfe1226524a9. Slice 2/3 concluído (voto + duplicidade, review aplicado), sobre slice 1 mergeada.
+Épico: H90-15-EPICO / run_bfe1226524a9. Slice 3/3 concluído sobre slices 1–2 mergeados. Épico
+completo nesta branch. 2 ciclos de review (ver Entregas/Decisões); o 2º corrigiu falha de
+segurança (contagem parcial exposta em ABERTA).
 
 ## Módulos
 
-- `com.votacao` — `Application` (bean `Clock` system default).
+- `com.votacao` — `Application` (bean `Clock` system default, único em todo o app).
 - `com.votacao.domain.{pauta,sessao,voto}` — entidades (`Pauta`; `Sessao` com `UK_PAUTA_ID`;
   `Voto` com `UK_PAUTA_ASSOCIADO` em `(pauta_id, id_associado)`), repositórios
-  (`VotoRepository.existsByPautaIdAndIdAssociado`), enum `TipoVoto` (SIM/NAO), exceções
-  (`PautaNotFoundException`, `SessaoJaAbertaException`, `VotoDuplicadoException`,
+  (`VotoRepository.existsByPautaIdAndIdAssociado`, `.contarPorTipo` via `@Query` GROUP BY,
+  projeção `VotoRepository.ContagemPorTipo`), enum `TipoVoto` (SIM/NAO), enum `StatusSessao`
+  (NAO_INICIADA/ABERTA/FECHADA/EXPIRADA — `FECHADA` reservado, valor estável, ver Decisões),
+  exceções (`PautaNotFoundException`, `SessaoJaAbertaException`, `VotoDuplicadoException`,
   `SessaoIndisponivelParaVotoException`).
-- `com.votacao.application.{pauta,sessao,voto}` — `PautaService` (criar, buscarPorId);
-  `SessaoService`/`VotoService` (`@Transactional`, `Clock` injetado); `VotoService.registrar`:
-  busca pauta → valida sessão aberta → checa duplicata → salva, com backstop de constraint única.
+- `com.votacao.application.{pauta,sessao,voto}` — `PautaService`; `SessaoService`/`VotoService`/
+  `ResultadoService` (todos `@Transactional`, `Clock` injetado; `apurar` é readOnly).
+  `VotoService.registrar`: pauta → sessão aberta → duplicata → salva, backstop de constraint
+  única. `ResultadoService.apurar`: pauta (404 se ausente) → sessão opcional → lê `Clock` **uma
+  única vez** (`agora`), deriva `StatusSessao`/`timestamp` do mesmo instante (ver Entregas) →
+  agrega contagens **só quando `status_sessao` é `EXPIRADA`/`FECHADA`**; `ABERTA`/`NAO_INICIADA`
+  retornam zeros sem consultar votos (ver Decisões).
 - `com.votacao.api.{pauta,sessao,voto}` — controllers + DTOs (`PautaRequest` com
-  `@Size(max=255)`; `VotoRequest` com `id_associado`/`voto` via `@JsonProperty`, `@Positive`).
-- `com.votacao.infrastructure.error` — `ApiErrorHandler` (`@RestControllerAdvice`), `ErrorResponse`.
+  `@Size(max=255)`; `VotoRequest` com `@JsonProperty`/`@Positive`; `ResultadoResponse` record
+  snake_case, `timestamp` como `OffsetDateTime`). `ResultadoController` em `com.votacao.api.pauta`
+  (sub-recurso de pauta, não pacote próprio), `GET /pautas/{id}/resultado`.
+- `com.votacao.infrastructure.error` — `ApiErrorHandler`, `ErrorResponse` (`timestamp` ainda
+  `LocalDateTime`, não alterado — ver Pendências).
 
 ## Stack e comandos
 
 - Java 21, Spring Boot 3.3.4, Spring Web, Spring Data JPA, Bean Validation, H2 em memória.
 - Build: Maven. Usar `mvnd` (daemon quente). `mvn` puro também funciona (mais lento).
 - `mvnd test` roda a suite. `mvnd spring-boot:run` sobe a API em `/api`.
-- **Armadilha de ambiente:** `/tmp` está montado `noexec` neste ambiente — jansi/jline
-  (usados pelo mvnd/mvn CLI) falham ao carregar libs nativas em `/tmp`. Workaround: exportar
+- **Armadilha de ambiente:** `/tmp` montado `noexec` — jansi/jline (mvnd/mvn CLI) falham ao
+  carregar libs nativas. Workaround: exportar
   `JAVA_TOOL_OPTIONS="-Djansi.tmpdir=$(pwd)/.tmp -Djline.tmpdir=$(pwd)/.tmp -Djava.io.tmpdir=$(pwd)/.tmp"`
-  antes de chamar `mvnd`/`mvn` (diretório `.tmp/` dentro do projeto, ignorado no `.gitignore`).
-  Passar as propriedades só como argumento `-D` do próprio `mvnd` não bastou nesta sessão — o
-  processo cliente do mvnd já tenta carregar jansi antes de repassar os argumentos ao daemon;
-  `JAVA_TOOL_OPTIONS` é lido por qualquer JVM que o comando dispare. Não afeta o resultado do
-  build, só a saída de log/warning.
+  antes de `mvnd`/`mvn` (`.tmp/` do projeto, no `.gitignore`). Só flag `-D` do `mvnd` não basta —
+  cliente já tenta carregar jansi antes de repassar ao daemon. Não afeta resultado do build, só log.
 
 ## Convenções
 
-- Pacotes por camada (`api` / `application` / `domain` / `infrastructure`), sub-pacote por
-  domínio (`pauta`, `sessao`, `voto`). Testes de integração ponta-a-ponta ficam em
-  `com.votacao.integration` (não espelham pacote de produção, pois cruzam camadas).
-- Entidades JPA imutáveis do ponto de vista de API pública: sem setters, construtor com
-  campos obrigatórios, construtor protegido sem args para o Hibernate.
-- DTOs como `record`. Campos em snake_case no JSON (`duracao_minutos`, `id_associado`) mapeados
-  via `@JsonProperty` no campo Java em camelCase.
-- Erros: todas as exceções capturadas em `ApiErrorHandler`, resposta sempre
-  `{"error", "timestamp", "path"}`. Cobertura: `HttpMessageNotReadableException` (400, JSON
-  malformado/enum inválido), `MethodArgumentTypeMismatchException` (400), `NoHandlerFoundException`
-  /`NoResourceFoundException` (404), `HttpRequestMethodNotSupportedException` (405),
-  `VotoDuplicadoException` (409), `SessaoJaAbertaException`/`SessaoIndisponivelParaVotoException`
-  (422), `Exception` genérica (500, fallback — deve ficar por último para não mascarar os
-  específicos).
-- Testes de service: JUnit 5 + Mockito (`@ExtendWith(MockitoExtension.class)`), `Clock.fixed`
-  para determinismo em `SessaoServiceTest`/`VotoServiceTest`.
-- Testes de controller: `@SpringBootTest` + `@AutoConfigureMockMvc`. **MockMvc NÃO aplica
-  `server.servlet.context-path`** — testes usam paths sem `/api` (`/pautas/...`), incl. `$.path`
-  do erro. Limitação do ambiente de teste, não do comportamento em produção.
-- Para validar `/api` de fato (inclusive `path` do erro) e concorrência real (múltiplas threads),
-  usar `@SpringBootTest(webEnvironment = RANDOM_PORT)` + `TestRestTemplate` (+ `ExecutorService`
-  para concorrência) — ver `ContextPathIntegrationTest`, `SessaoConcorrenciaIntegrationTest`,
-  `VotoConcorrenciaIntegrationTest`. Testes unitários com mock de
-  `DataIntegrityViolationException` cobrem a lógica de tradução isoladamente, mas não provam a
-  constraint de BD por si só.
+- Pacotes por camada (`api`/`application`/`domain`/`infrastructure`), sub-pacote por domínio.
+  Testes de integração ponta-a-ponta em `com.votacao.integration` (cruzam camadas). Entidades
+  JPA sem setters, construtor com campos obrigatórios + construtor protegido sem args. DTOs
+  como `record`, snake_case via `@JsonProperty` no campo camelCase.
+- Erros: toda exceção vira `{"error","timestamp","path"}` via `ApiErrorHandler`. Cobertura:
+  `HttpMessageNotReadableException`/`MethodArgumentTypeMismatchException` (400),
+  `NoHandlerFoundException`/`NoResourceFoundException` (404),
+  `HttpRequestMethodNotSupportedException` (405), `VotoDuplicadoException` (409),
+  `SessaoJaAbertaException`/`SessaoIndisponivelParaVotoException` (422), `Exception` genérica
+  (500, fallback por último). `PautaNotFoundException` reutilizada por `ResultadoService`.
+- `SessaoController.abrir` usa `@RequestBody(required = false)`: body vazio não é erro, vira
+  `SessaoRequest(null)` + `DURACAO_PADRAO_MINUTOS` (1). Sem `required = false`, body vazio
+  quebra com 400 antes do `@Valid`, mesmo a duração sendo opcional por design.
+- `PautaRequest.titulo`/`descricao` com `@Size(max = 255)`, alinhado ao `length = 255` da coluna
+  — sem o limite no DTO, payload maior causava `DataIntegrityViolationException` (500) em vez de 400.
+- Testes de service: JUnit 5 + Mockito, `Clock.fixed` para determinismo (exceto teste dedicado
+  de leitura única, que usa `Clock` custom avançando por chamada — ver Entregas). `ContagemPorTipo`
+  mockada com classe anônima. Testes de controller: `@SpringBootTest` + `@AutoConfigureMockMvc`.
+  **MockMvc NÃO aplica `server.servlet.context-path`** — paths sem `/api`, incl. `$.path` do
+  erro. Limitação do ambiente de teste, não do comportamento em produção.
+- Para `/api` de fato e concorrência real: `@SpringBootTest(RANDOM_PORT)` + `TestRestTemplate`
+  — ver `ContextPathIntegrationTest`, `*ConcorrenciaIntegrationTest`, `ResultadoIntegrationTest`.
+  Helpers de `ResultadoIntegrationTest` (`criarPauta`/`abrirSessao`/`votar`) checam `HttpStatus`
+  antes de seguir; os demais `*IntegrationTest` não foram alterados para isso. Timestamp testado
+  por valor: `isEqualTo(...now(clock))` com `Clock` controlado; `isCloseTo(..., within(5s))` em
+  integração (sem `Clock` injetável no contexto real).
 
 ## Decisões
 
-- Context-path `/api` fixado em `application.properties` (ver Convenções para limitação do
-  MockMvc).
-- Concorrência na abertura de sessão: dupla barreira — check `findByPautaId` no service (rejeita
-  cedo) + constraint única nomeada (`Sessao.UK_PAUTA_ID` = `uk_sessao_pauta_id`) em
-  `sessao.pauta_id`. `abrir()` é `@Transactional`. Tradução de `DataIntegrityViolationException`
-  só vira `SessaoJaAbertaException` se a mensagem referenciar a constraint (nome, ou
-  `sessao`+`pauta_id`); outra violação relança sem tradução. Coberto por `SessaoServiceTest`
-  (violação não relacionada) e `SessaoConcorrenciaIntegrationTest` (10 reqs, 1×201 + 9×422).
-- Voto segue o mesmo padrão de dupla barreira: check `existsByPautaIdAndIdAssociado` no
-  `VotoService` (rejeita cedo com 409) + constraint única nomeada (`Voto.UK_PAUTA_ASSOCIADO` =
-  `uk_voto_pauta_associado`) em `(pauta_id, id_associado)`. `registrar()` é `@Transactional`.
-  Tradução de `DataIntegrityViolationException` tenta, em ordem: (1)
-  `org.hibernate.exception.ConstraintViolationException#getConstraintName()` via `getCause()`
-  comparado com `Voto.UK_PAUTA_ASSOCIADO` (`equalsIgnoreCase`) — só confirma se bater exato, não
-  usado para negar; (2) fallback por mensagem (sempre roda, pois o H2 às vezes reporta um índice
-  autogerado mesmo em `getConstraintName()`): nome da constraint em substring, OU token
-  `CONSTRAINT_INDEX` + colunas `pauta_id`/`id_associado` juntas (cobre
-  `CONSTRAINT_INDEX_9 ON PUBLIC.VOTO(PAUTA_ID, ID_ASSOCIADO)`). Removido o critério frouxo
-  `contains("voto")` isolado (mascarava violação em coluna diferente da mesma tabela). Coberto por
-  `VotoServiceTest` (nome exato, índice autogerado com colunas certas, índice autogerado com
-  coluna diferente, violação não relacionada) e `VotoConcorrenciaIntegrationTest`.
-- Ordem de validação em `VotoService.registrar` (primeira falha vence): 1. pauta existe (404)
-  2. sessão aberta (422) 3. duplicata (409) 4. payload/Bean Validation, antes do controller
-  chamar o service (400).
-- Duplicata mapeada para 409 (conflito com recurso existente), sessão inválida para 422 — conforme
-  decisões documentadas no `task.md` do slice 2.
-- `TipoVoto` é enum (`SIM`/`NAO`) mapeado via Jackson; valor fora do enum já cai em
-  `HttpMessageNotReadableException` (400) no deserializer padrão, sem handler extra necessário.
-- `PautaRequest.titulo`/`descricao` limitados a 255 caracteres via `@Size(max = 255)`, alinhado ao
-  `length = 255` explícito nas colunas de `Pauta`. Sem o limite, payload grande causava
-  `DataIntegrityViolationException` não capturada (500) em vez de 400.
-- Duração de sessão: sem teto superior implementado (épico não define limite). Pendência aberta,
-  listada abaixo.
+- Context-path `/api` fixado em `application.properties` (ver Convenções/MockMvc).
+- Concorrência (sessão e voto): check no service + constraint única de BD como backstop
+  (`Sessao.UK_PAUTA_ID`, `Voto.UK_PAUTA_ASSOCIADO`). Tradução de `DataIntegrityViolationException`
+  tenta nome exato via `getConstraintName()`, fallback por mensagem (substring OU token
+  `CONSTRAINT_INDEX` + colunas). Implementada em `SessaoService.violaConstraintDeSessaoUnica`/
+  `VotoService.violaConstraintDeVotoUnico` (ambos privados, mesma lógica de fallback — ver
+  Armadilhas para o detalhe do token `CONSTRAINT_INDEX`). Ordem de validação em
+  `VotoService.registrar`: pauta existe (404) → sessão aberta (422) → duplicata (409) → Bean
+  Validation antes do controller (400).
+- **Status derivado na leitura, sem job**: sem sessão → `NAO_INICIADA` (200, não 404; contagens
+  zeradas — ver AC-4.6); `agora < fechamento` → `ABERTA`; senão → `EXPIRADA` (master spec
+  ambíguo entre "FECHADA ou EXPIRADA"; decisão: `EXPIRADA` para expiração por tempo). **Travado
+  como contrato estável**: `EXPIRADA` = "encerrada pelo tempo", `FECHADA` (futuro, reservado) =
+  "encerrada manualmente" — eventos distintos; clientes que querem "sessão não vota mais" devem
+  checar `status_sessao` diferente de `ABERTA`/`NAO_INICIADA`, não só `== EXPIRADA`.
+- **Contagens ocultas enquanto `ABERTA` (correção de review, HIGH-1 segurança).** Endpoint sem
+  autenticação; expor `votos_sim`/`votos_nao` em tempo real permite voto estratégico.
+  `ResultadoService.apurar` só agrega (`votoRepository.contarPorTipo`, `GROUP BY v.tipo`) quando
+  `status_sessao` é `EXPIRADA`/`FECHADA`; `ABERTA`/`NAO_INICIADA` retornam zeros sem consultar
+  votos. **Contradiz AC-4.4 do `task.md`** ("sessão aberta... contagens atuais") — review tratou
+  a exposição como falha bloqueante; ocultar prevalece sobre o AC até sign-off formal do produto.
+  Coberto por `ResultadoServiceTest.apurar_sessaoAberta_ocultaContagensEStatusAberta`
+  (`verify(never())` em `contarPorTipo`), `ResultadoControllerTest`, `ResultadoIntegrationTest`.
+- `timestamp` do resultado é `OffsetDateTime`, não `LocalDateTime` — cliente em outro fuso
+  precisa do instante absoluto. `ErrorResponse`/demais DTOs seguem em `LocalDateTime` (ver
+  Pendências).
+- `ResultadoService.apurar` é `@Transactional(readOnly = true)`, alinhado a
+  `SessaoService`/`VotoService`: hint de otimização (flush `MANUAL`), mesma transação/conexão
+  para as 3 leituras. **Não eleva isolamento** — H2 roda em READ COMMITTED por padrão, não impede
+  snapshots diferentes sob concorrência; precisaria de `REPEATABLE_READ` explícito para isso.
+  Coberto por teste de reflexão (só a anotação).
+- Duplicata 409, sessão inválida 422, pauta ausente 404 — herdadas dos slices 1–2.
 
 ## Entregas
 
-- Slice 1/3: CRUD básico de pauta + abertura de sessão. Endpoints `POST /api/pautas`,
-  `GET /api/pautas/{id}`, `POST /api/pautas/{id}/sessao`. Review aplicado: erro padrão em toda
-  exceção, `@Size` em `PautaRequest`, `@Transactional` + tradução seletiva de constraint.
-- Slice 2/3: registro de voto (`POST /api/pautas/{id}/votos`) com validação de pauta existente,
-  sessão aberta e duplicata (service + constraint de BD como backstop). Entidade `Voto`,
-  `VotoRepository`, `VotoService`, `VotoController` + DTOs, `ApiErrorHandler` estendido para 409
-  (duplicata) e 422 (sessão inválida). `VotoServiceTest` (10 casos, incl. violação de constraint
-  por nome exato, por índice autogerado `CONSTRAINT_INDEX_N` com colunas certas/erradas),
-  `VotoControllerTest` (8 casos MockMvc), `VotoConcorrenciaIntegrationTest` (10 reqs concorrentes,
-  1×201 + 9×409).
-- Ciclo de correção de review aplicado ao slice 2: `VotoRequest.idAssociado` ganhou `@Positive`;
-  fallback de constraint restrito (token `CONSTRAINT_INDEX` + colunas, sem `contains("voto")`
-  isolado) — ver Decisões. Riscos aceitos (identidade do voto sem auth, enumeração 404/422/409)
-  documentados formalmente em Pendências, com prazo.
-- Suite completa: 51 testes, `mvnd test` → BUILD SUCCESS, 0 failures, 0 errors, 0 skipped.
+- Slice 1/3: CRUD de pauta + abertura de sessão. Review: erro padrão, `@Size` em `PautaRequest`,
+  `@Transactional` + tradução seletiva de constraint.
+- Slice 2/3: registro de voto com validação de pauta/sessão/duplicata. Review: constraint por
+  nome exato e índice autogerado, `VotoConcorrenciaIntegrationTest` (10 reqs concorrentes).
+- Slice 3/3: resultado agregado (`ResultadoService`/`Controller`/`Response`, `StatusSessao`,
+  `contarPorTipo`). 1º ciclo: `timestamp` testado por valor; `verify(never())` em NAO_INICIADA;
+  `readOnly` com teste de reflexão; `EXPIRADA` travado como contrato; `apurar` corrigido para ler
+  `clock.instant()` uma só vez (status e timestamp do mesmo instante), sem teste que provasse
+  isso ainda. 2º ciclo (review de segurança, HIGH-1): contagem parcial em `ABERTA` era falha, não
+  risco aceitável — corrigido ocultando `votos_sim`/`votos_nao` (zerados) até `EXPIRADA`/`FECHADA`
+  (ver Decisões); adicionado `ContadorDeLeiturasClock` (Clock que avança por chamada) provando a
+  leitura única do 1º ciclo.
+- Suite completa: 62 testes, `mvnd test` → BUILD SUCCESS, 0 failures/errors/skipped.
 
 ## Armadilhas
 
-- `/tmp` noexec quebra jansi/jline do `mvnd`/`mvn` CLI — ver seção Stack e comandos acima
-  (usar `JAVA_TOOL_OPTIONS`, não só flags `-D` do `mvnd`).
-- `SessaoRequest` com corpo HTTP vazio (sem `Content-Type`/body): controller trata `request == null`
-  criando `SessaoRequest(null)` manualmente, pois `@RequestBody(required = false)` com body
-  ausente chega como `null` em vez de lançar erro.
-- MockMvc não aplica `server.servlet.context-path` — não assumir isso em testes futuros de
-  controller; usar integração com servidor real quando o comportamento do prefixo importar.
-- Nomear `@UniqueConstraint` explicitamente nem sempre garante que o nome apareça na mensagem de
-  erro do H2 nem em `getConstraintName()` do Hibernate — pode reportar índice autogerado
-  (`CONSTRAINT_INDEX_N`), confirmado para `Voto.UK_PAUTA_ASSOCIADO` nesta sessão. Ver tratamento
-  em Decisões (voto). Ao adicionar novas entidades com unicidade, sempre incluir fallback por
-  token `CONSTRAINT_INDEX` + colunas, exigindo as colunas (não só o nome da tabela, que é frouxo
-  demais e mascara violação em outra coluna da mesma tabela).
+- `/tmp` noexec quebra jansi/jline — usar `JAVA_TOOL_OPTIONS` (ver Stack e comandos). MockMvc
+  não aplica `server.servlet.context-path` — usar integração com servidor real quando importar.
+- `SessaoController.abrir` usa `@RequestBody(required = false)` — replicar em endpoints novos
+  com corpo opcional; sem isso, body vazio quebra com 400 antes de qualquer validação rodar.
+- `@UniqueConstraint` nomeada nem sempre aparece na mensagem de erro do H2 (índice autogerado
+  `CONSTRAINT_INDEX_N`) — fallback por token `CONSTRAINT_INDEX` + colunas, nunca só nome de
+  tabela (ver Decisões). Projeção Spring Data (`ContagemPorTipo`) não aceita construtor em
+  teste — mockar com classe anônima.
+- Ao adicionar lógica que dependa de "agora", capturar o instante uma vez no topo do método
+  (`clock.instant()`) — leituras separadas podem divergir se a fronteira relevante (ex.:
+  fechamento de sessão) for cruzada entre elas (ver Entregas, slice 3). Teste precisa de `Clock`
+  que avança por chamada; `Clock.fixed` não pega essa regressão.
 
 ## Pendências
 
-- Limite superior para `duracao_minutos`: não implementado, não definido pelo épico. Confirmar
-  com stakeholder antes do merge final (mencionado no `task.md` original como questão em aberto).
-- **Risco aceito formalmente — identidade do voto sem autenticação** (bloqueio de design levantado
-  em review de segurança). `id_associado` cru no payload: qualquer cliente vota em nome de
-  qualquer associado (loop forja resultado). Aceito para o slice 2 — sem entidade de associado nem
-  login no sistema ainda, fora do MUST/COULD do `task.md`, sem stakeholder/prazo definido pelo
-  épico. **Prazo: resolver antes de exposição fora de teste/demo** (pré-requisito de produção);
-  quem adicionar cadastro de associados revisita este item. Mitigação parcial: `@Positive` em
-  `id_associado` (não resolve auth). Mesma pendência cobre criar pauta/abrir sessão sem restrição.
-  **Decorrência aceita:** 409/404/422 juntos enumeram estado de pauta/voto para qualquer chamador;
-  mantido assim porque o problema real é a falta de auth, não o código de status — revisitar junto
-  com o item acima.
-- `SessaoResponse.from` hardcoda `status = "ABERTA"`; derivar do estado real deve entrar no slice
-  de resultado.
-- Slice 3 (resultado agregado): depende de `VotoRepository` para contagem SIM/NAO — já atendido.
-- `VotoRequest.idAssociado` rejeita não positivo (`@Positive`), mas não valida associado real
-  (sem entidade de associado ainda) — revisitar com cadastro de associados e com auth acima.
+- Limite superior para `duracao_minutos`: não implementado. **Risco aceito — identidade sem
+  autenticação** (slice 2, reforçado no slice 3): `id_associado` cru permite votar em nome de
+  qualquer associado; aceito por não haver entidade de associado/login. **Prazo: resolver antes
+  de exposição fora de teste/demo.** Mesma raiz: 404/409/422 enumeram estado de pauta/voto/sessão.
+  Sem teto, sessão pode ficar `ABERTA` indefinidamente (nunca `EXPIRADA`) — voto estratégico via
+  contagem parcial foi corrigido (ver Decisões), mas sessão também nunca "fecha"; considerar `@Max`.
+- `contarPorTipo` agrega todos os votos sem índice `(pauta_id, tipo)`/cache; roda só em
+  `EXPIRADA`/`FECHADA` agora (sem polling em `ABERTA`), mas pautas grandes pagam `GROUP BY` cheio.
+- `SessaoResponse.from` hardcoda `status = "ABERTA"` (COULD C2, não implementado);
+  `VotoRequest.idAssociado` não valida associado real (cadastro/auth); `StatusSessao.FECHADA`
+  nunca é emitido (reservado, travado nas Decisões); `ErrorResponse.timestamp` segue
+  `LocalDateTime`, diferente do `OffsetDateTime` de `ResultadoResponse`.
