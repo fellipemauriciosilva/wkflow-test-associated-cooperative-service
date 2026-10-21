@@ -44,7 +44,7 @@ public class ResultadoService {
 
         long votosSim = 0L;
         long votosNao = 0L;
-        if (sessao.isPresent()) {
+        if (statusSessao == StatusSessao.EXPIRADA || statusSessao == StatusSessao.FECHADA) {
             for (VotoRepository.ContagemPorTipo contagem : votoRepository.contarPorTipo(pautaId)) {
                 if (contagem.getTipo() == TipoVoto.SIM) {
                     votosSim = contagem.getTotal();

@@ -70,7 +70,7 @@ class ResultadoControllerTest {
     }
 
     @Test
-    void apurarResultado_sessaoAbertaComVotos_retorna200ComContagensEStatusAberta() throws Exception {
+    void apurarResultado_sessaoAbertaComVotos_retorna200ComContagensOcultasEStatusAberta() throws Exception {
         Long pautaId = criarPauta("Pauta Resultado B");
         abrirSessao(pautaId, 30);
         votar(pautaId, 1L, "SIM");
@@ -80,9 +80,9 @@ class ResultadoControllerTest {
         MvcResult result = mockMvc.perform(get("/pautas/{id}/resultado", pautaId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status_sessao").value("ABERTA"))
-                .andExpect(jsonPath("$.votos_sim").value(2))
-                .andExpect(jsonPath("$.votos_nao").value(1))
-                .andExpect(jsonPath("$.total_votos").value(3))
+                .andExpect(jsonPath("$.votos_sim").value(0))
+                .andExpect(jsonPath("$.votos_nao").value(0))
+                .andExpect(jsonPath("$.total_votos").value(0))
                 .andReturn();
 
         assertTimestampProximoDeAgora(result);

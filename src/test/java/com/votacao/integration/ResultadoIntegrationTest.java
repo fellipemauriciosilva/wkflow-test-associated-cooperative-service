@@ -31,7 +31,7 @@ class ResultadoIntegrationTest {
     }
 
     @Test
-    void fluxoCompleto_criarPautaAbrirSessaoVotarEConsultarResultado_retornaContagensExatas() {
+    void fluxoCompleto_criarPautaAbrirSessaoVotarEConsultarResultado_ocultaContagensEnquantoAberta() {
         Long pautaId = criarPauta();
         abrirSessao(pautaId);
 
@@ -46,9 +46,9 @@ class ResultadoIntegrationTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         JsonNode body = response.getBody();
-        assertThat(body.get("votos_sim").asInt()).isEqualTo(3);
-        assertThat(body.get("votos_nao").asInt()).isEqualTo(2);
-        assertThat(body.get("total_votos").asInt()).isEqualTo(5);
+        assertThat(body.get("votos_sim").asInt()).isZero();
+        assertThat(body.get("votos_nao").asInt()).isZero();
+        assertThat(body.get("total_votos").asInt()).isZero();
         assertThat(body.get("status_sessao").asText()).isEqualTo("ABERTA");
         OffsetDateTime timestamp = OffsetDateTime.parse(body.get("timestamp").asText());
         assertThat(timestamp).isCloseTo(OffsetDateTime.now(), within(5, ChronoUnit.SECONDS));

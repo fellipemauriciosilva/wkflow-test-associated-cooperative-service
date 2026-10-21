@@ -69,23 +69,22 @@ class ResultadoServiceTest {
     }
 
     @Test
-    @DisplayName("apurar com sessão aberta deve retornar contagens exatas e status ABERTA")
-    void apurar_sessaoAberta_retornaContagensEStatusAberta() {
+    @DisplayName("apurar com sessão aberta deve ocultar contagens (zeradas) e retornar status ABERTA, sem consultar votos")
+    void apurar_sessaoAberta_ocultaContagensEStatusAberta() {
         Pauta pauta = new Pauta("Título", "Descrição");
         LocalDateTime abertura = LocalDateTime.now(clock).minusMinutes(1);
         Sessao sessao = new Sessao(pauta, abertura, 5);
         when(pautaService.buscarPorId(1L)).thenReturn(pauta);
         when(sessaoRepository.findByPautaId(1L)).thenReturn(Optional.of(sessao));
-        when(votoRepository.contarPorTipo(1L))
-                .thenReturn(List.of(contagem(TipoVoto.SIM, 3L), contagem(TipoVoto.NAO, 2L)));
 
         ResultadoResponse resultado = sut.apurar(1L);
 
-        assertThat(resultado.votosSim()).isEqualTo(3L);
-        assertThat(resultado.votosNao()).isEqualTo(2L);
-        assertThat(resultado.totalVotos()).isEqualTo(5L);
+        assertThat(resultado.votosSim()).isZero();
+        assertThat(resultado.votosNao()).isZero();
+        assertThat(resultado.totalVotos()).isZero();
         assertThat(resultado.statusSessao()).isEqualTo(StatusSessao.ABERTA);
         assertThat(resultado.timestamp()).isEqualTo(OffsetDateTime.now(clock));
+        verify(votoRepository, never()).contarPorTipo(1L);
     }
 
     @Test
@@ -142,6 +141,62 @@ class ResultadoServiceTest {
         assertThat(resultado.totalVotos()).isZero();
         assertThat(resultado.timestamp()).isEqualTo(OffsetDateTime.now(clock));
         verify(votoRepository, never()).contarPorTipo(1L);
+    }
+
+    @Test
+    @DisplayName("apurar deve ler o Clock uma única vez, evitando status e timestamp de instantes diferentes")
+    void apurar_leClockUmaUnicaVez_statusETimestampDoMesmoInstante() {
+        Instant antesDoFechamento = FIXED_INSTANT;
+        Instant depoisDoFechamento = FIXED_INSTANT.plusSeconds(600);
+        ContadorDeLeiturasClock clockContador =
+                new ContadorDeLeiturasClock(ZONE, List.of(antesDoFechamento, depoisDoFechamento));
+        ResultadoService sutComClockContador =
+                new ResultadoService(pautaService, sessaoRepository, votoRepository, clockContador);
+
+        Pauta pauta = new Pauta("Título", "Descrição");
+        LocalDateTime abertura = LocalDateTime.ofInstant(antesDoFechamento, ZONE).minusMinutes(1);
+        Sessao sessao = new Sessao(pauta, abertura, 5);
+        when(pautaService.buscarPorId(1L)).thenReturn(pauta);
+        when(sessaoRepository.findByPautaId(1L)).thenReturn(Optional.of(sessao));
+
+        ResultadoResponse resultado = sutComClockContador.apurar(1L);
+
+        assertThat(clockContador.quantidadeDeLeituras()).isEqualTo(1);
+        assertThat(resultado.statusSessao()).isEqualTo(StatusSessao.ABERTA);
+        assertThat(resultado.timestamp())
+                .isEqualTo(OffsetDateTime.ofInstant(antesDoFechamento, ZONE));
+    }
+
+    private static final class ContadorDeLeiturasClock extends Clock {
+        private final ZoneId zona;
+        private final List<Instant> instantes;
+        private int indice = 0;
+
+        private ContadorDeLeiturasClock(ZoneId zona, List<Instant> instantes) {
+            this.zona = zona;
+            this.instantes = instantes;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return zona;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Instant instant() {
+            Instant instante = instantes.get(indice);
+            indice++;
+            return instante;
+        }
+
+        int quantidadeDeLeituras() {
+            return indice;
+        }
     }
 
     @Test
