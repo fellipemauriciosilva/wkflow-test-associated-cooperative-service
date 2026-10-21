@@ -77,11 +77,19 @@ class SessaoControllerTest {
     void abrirSessao_comCorpoVazio_usaDuracaoPadraoDeUmMinuto() throws Exception {
         Long pautaId = criarPauta("Pauta Sessao C");
 
-        mockMvc.perform(post("/pautas/{id}/sessao", pautaId)
+        String response = mockMvc.perform(post("/pautas/{id}/sessao", pautaId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.status").value("ABERTA"));
+                .andExpect(jsonPath("$.status").value("ABERTA"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        var json = objectMapper.readTree(response);
+        LocalDateTime abertura = LocalDateTime.parse(json.get("abertura").asText());
+        LocalDateTime fechamento = LocalDateTime.parse(json.get("fechamento").asText());
+        org.assertj.core.api.Assertions.assertThat(Duration.between(abertura, fechamento).toMinutes()).isEqualTo(1);
     }
 
     @Test

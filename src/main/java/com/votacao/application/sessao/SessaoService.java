@@ -7,8 +7,10 @@ import com.votacao.domain.sessao.SessaoJaAbertaException;
 import com.votacao.domain.sessao.SessaoRepository;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Locale;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class SessaoService {
@@ -23,6 +25,7 @@ public class SessaoService {
         this.clock = clock;
     }
 
+    @Transactional
     public Sessao abrir(Long pautaId, int duracaoMinutos) {
         Pauta pauta = pautaService.buscarPorId(pautaId);
 
@@ -36,7 +39,17 @@ public class SessaoService {
         try {
             return sessaoRepository.save(sessao);
         } catch (DataIntegrityViolationException ex) {
-            throw new SessaoJaAbertaException(pautaId);
+            if (violaConstraintDeSessaoUnica(ex)) {
+                throw new SessaoJaAbertaException(pautaId);
+            }
+            throw ex;
         }
+    }
+
+    private boolean violaConstraintDeSessaoUnica(DataIntegrityViolationException ex) {
+        String mensagem = String.valueOf(ex.getMostSpecificCause().getMessage()).toLowerCase(Locale.ROOT);
+        boolean nomeDaConstraint = mensagem.contains(Sessao.UK_PAUTA_ID.toLowerCase(Locale.ROOT));
+        boolean tabelaEColuna = mensagem.contains("sessao") && mensagem.contains("pauta_id");
+        return nomeDaConstraint || tabelaEColuna;
     }
 }

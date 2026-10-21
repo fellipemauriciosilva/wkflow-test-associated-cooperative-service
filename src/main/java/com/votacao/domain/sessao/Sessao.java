@@ -13,15 +13,17 @@ import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "sessao", uniqueConstraints = @UniqueConstraint(columnNames = "pauta_id"))
+@Table(name = "sessao", uniqueConstraints = @UniqueConstraint(name = Sessao.UK_PAUTA_ID, columnNames = "pauta_id"))
 public class Sessao {
+
+    public static final String UK_PAUTA_ID = "uk_sessao_pauta_id";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @OneToOne
-    @JoinColumn(name = "pauta_id", nullable = false, unique = true)
+    @JoinColumn(name = "pauta_id", nullable = false)
     private Pauta pauta;
 
     @Column(nullable = false)

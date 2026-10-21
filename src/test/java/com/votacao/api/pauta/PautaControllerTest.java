@@ -51,6 +51,32 @@ class PautaControllerTest {
     }
 
     @Test
+    void criarPauta_comTituloExcedendoTamanhoMaximo_retorna400NoFormatoPadrao() throws Exception {
+        String tituloGrande = "a".repeat(256);
+        String body = objectMapper.writeValueAsString(new PautaRequestFixture(tituloGrande, "x"));
+
+        mockMvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").exists())
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.path").value("/pautas"));
+    }
+
+    @Test
+    void criarPauta_comDescricaoExcedendoTamanhoMaximo_retorna400NoFormatoPadrao() throws Exception {
+        String descricaoGrande = "a".repeat(256);
+        String body = objectMapper.writeValueAsString(new PautaRequestFixture("Pauta", descricaoGrande));
+
+        mockMvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").exists());
+    }
+
+    @Test
     void criarPauta_comTituloAusente_retorna400() throws Exception {
         String body = "{\"descricao\":\"x\"}";
 

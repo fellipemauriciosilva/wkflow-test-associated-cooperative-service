@@ -97,14 +97,33 @@ class SessaoServiceTest {
     }
 
     @Test
-    @DisplayName("abrir com corrida detectada pelo BD (constraint única) deve lançar SessaoJaAbertaException")
+    @DisplayName("abrir com corrida detectada pelo BD (constraint única de sessão) deve lançar SessaoJaAbertaException")
     void abrir_constraintUnicaViolada_lancaExcecao() {
         Pauta pauta = new Pauta("Título", "Descrição");
         when(pautaService.buscarPorId(1L)).thenReturn(pauta);
         when(sessaoRepository.findByPautaId(1L)).thenReturn(Optional.empty());
-        when(sessaoRepository.save(any(Sessao.class))).thenThrow(new DataIntegrityViolationException("duplicate"));
+        DataIntegrityViolationException excecaoConstraint = new DataIntegrityViolationException(
+                "could not execute statement",
+                new RuntimeException("Unique index or primary key violation: \"" + Sessao.UK_PAUTA_ID + "\""));
+        when(sessaoRepository.save(any(Sessao.class))).thenThrow(excecaoConstraint);
 
         assertThatThrownBy(() -> sut.abrir(1L, 1))
                 .isInstanceOf(SessaoJaAbertaException.class);
+    }
+
+    @Test
+    @DisplayName("abrir com violação de integridade não relacionada à constraint de sessão deve relançar a exceção original")
+    void abrir_violacaoDeIntegridadeNaoRelacionada_relancaExcecaoOriginal() {
+        Pauta pauta = new Pauta("Título", "Descrição");
+        when(pautaService.buscarPorId(1L)).thenReturn(pauta);
+        when(sessaoRepository.findByPautaId(1L)).thenReturn(Optional.empty());
+        DataIntegrityViolationException excecaoOutraConstraint = new DataIntegrityViolationException(
+                "could not execute statement",
+                new RuntimeException("NULL not allowed for column \"ABERTURA\""));
+        when(sessaoRepository.save(any(Sessao.class))).thenThrow(excecaoOutraConstraint);
+
+        assertThatThrownBy(() -> sut.abrir(1L, 1))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .isNotInstanceOf(SessaoJaAbertaException.class);
     }
 }

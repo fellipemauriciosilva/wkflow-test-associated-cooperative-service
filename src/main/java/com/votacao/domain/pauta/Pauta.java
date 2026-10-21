@@ -17,9 +17,10 @@ public class Pauta {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 255)
     private String titulo;
 
+    @Column(length = 255)
     private String descricao;
 
     @CreationTimestamp
