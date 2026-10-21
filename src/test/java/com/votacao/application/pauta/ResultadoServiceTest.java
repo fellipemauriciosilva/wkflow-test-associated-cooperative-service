@@ -2,6 +2,8 @@ package com.votacao.application.pauta;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.votacao.api.pauta.dto.ResultadoResponse;
@@ -12,9 +14,11 @@ import com.votacao.domain.sessao.SessaoRepository;
 import com.votacao.domain.sessao.StatusSessao;
 import com.votacao.domain.voto.TipoVoto;
 import com.votacao.domain.voto.VotoRepository;
+import java.lang.reflect.Method;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
@@ -24,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.annotation.Transactional;
 
 @ExtendWith(MockitoExtension.class)
 class ResultadoServiceTest {
@@ -80,6 +85,7 @@ class ResultadoServiceTest {
         assertThat(resultado.votosNao()).isEqualTo(2L);
         assertThat(resultado.totalVotos()).isEqualTo(5L);
         assertThat(resultado.statusSessao()).isEqualTo(StatusSessao.ABERTA);
+        assertThat(resultado.timestamp()).isEqualTo(OffsetDateTime.now(clock));
     }
 
     @Test
@@ -98,6 +104,7 @@ class ResultadoServiceTest {
         assertThat(resultado.votosSim()).isZero();
         assertThat(resultado.votosNao()).isZero();
         assertThat(resultado.totalVotos()).isZero();
+        assertThat(resultado.timestamp()).isEqualTo(OffsetDateTime.now(clock));
     }
 
     @Test
@@ -117,10 +124,11 @@ class ResultadoServiceTest {
         assertThat(resultado.votosSim()).isEqualTo(3L);
         assertThat(resultado.votosNao()).isEqualTo(2L);
         assertThat(resultado.totalVotos()).isEqualTo(5L);
+        assertThat(resultado.timestamp()).isEqualTo(OffsetDateTime.now(clock));
     }
 
     @Test
-    @DisplayName("apurar pauta sem sessão deve retornar status NAO_INICIADA e contagens zeradas")
+    @DisplayName("apurar pauta sem sessão deve retornar status NAO_INICIADA e contagens zeradas, sem consultar votos")
     void apurar_pautaSemSessao_retornaNaoIniciadaEZerado() {
         Pauta pauta = new Pauta("Título", "Descrição");
         when(pautaService.buscarPorId(1L)).thenReturn(pauta);
@@ -132,6 +140,18 @@ class ResultadoServiceTest {
         assertThat(resultado.votosSim()).isZero();
         assertThat(resultado.votosNao()).isZero();
         assertThat(resultado.totalVotos()).isZero();
+        assertThat(resultado.timestamp()).isEqualTo(OffsetDateTime.now(clock));
+        verify(votoRepository, never()).contarPorTipo(1L);
+    }
+
+    @Test
+    @DisplayName("apurar deve ser somente leitura (readOnly), consistente com SessaoService/VotoService")
+    void apurar_estaAnotadoComTransactionalReadOnly() throws NoSuchMethodException {
+        Method apurar = ResultadoService.class.getMethod("apurar", Long.class);
+        Transactional transactional = apurar.getAnnotation(Transactional.class);
+
+        assertThat(transactional).isNotNull();
+        assertThat(transactional.readOnly()).isTrue();
     }
 
     @Test

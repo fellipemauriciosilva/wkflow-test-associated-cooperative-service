@@ -1,17 +1,22 @@
 package com.votacao.api.pauta;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -52,13 +57,16 @@ class ResultadoControllerTest {
     void apurarResultado_pautaSemSessao_retorna200ComNaoIniciadaEZerado() throws Exception {
         Long pautaId = criarPauta("Pauta Resultado A");
 
-        mockMvc.perform(get("/pautas/{id}/resultado", pautaId))
+        MvcResult result = mockMvc.perform(get("/pautas/{id}/resultado", pautaId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status_sessao").value("NAO_INICIADA"))
                 .andExpect(jsonPath("$.votos_sim").value(0))
                 .andExpect(jsonPath("$.votos_nao").value(0))
                 .andExpect(jsonPath("$.total_votos").value(0))
-                .andExpect(jsonPath("$.timestamp").exists());
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andReturn();
+
+        assertTimestampProximoDeAgora(result);
     }
 
     @Test
@@ -69,12 +77,23 @@ class ResultadoControllerTest {
         votar(pautaId, 2L, "SIM");
         votar(pautaId, 3L, "NAO");
 
-        mockMvc.perform(get("/pautas/{id}/resultado", pautaId))
+        MvcResult result = mockMvc.perform(get("/pautas/{id}/resultado", pautaId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status_sessao").value("ABERTA"))
                 .andExpect(jsonPath("$.votos_sim").value(2))
                 .andExpect(jsonPath("$.votos_nao").value(1))
-                .andExpect(jsonPath("$.total_votos").value(3));
+                .andExpect(jsonPath("$.total_votos").value(3))
+                .andReturn();
+
+        assertTimestampProximoDeAgora(result);
+    }
+
+    private void assertTimestampProximoDeAgora(MvcResult result) throws Exception {
+        String response = result.getResponse().getContentAsString();
+        String timestampBruto = objectMapper.readTree(response).get("timestamp").asText();
+        OffsetDateTime timestamp = OffsetDateTime.parse(timestampBruto);
+
+        assertThat(timestamp).isCloseTo(OffsetDateTime.now(), within(5, ChronoUnit.SECONDS));
     }
 
     @Test

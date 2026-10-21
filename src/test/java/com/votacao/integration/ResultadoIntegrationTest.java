@@ -1,8 +1,11 @@
 package com.votacao.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -47,7 +50,8 @@ class ResultadoIntegrationTest {
         assertThat(body.get("votos_nao").asInt()).isEqualTo(2);
         assertThat(body.get("total_votos").asInt()).isEqualTo(5);
         assertThat(body.get("status_sessao").asText()).isEqualTo("ABERTA");
-        assertThat(body.get("timestamp").asText()).isNotBlank();
+        OffsetDateTime timestamp = OffsetDateTime.parse(body.get("timestamp").asText());
+        assertThat(timestamp).isCloseTo(OffsetDateTime.now(), within(5, ChronoUnit.SECONDS));
     }
 
     private Long criarPauta() {
@@ -56,6 +60,7 @@ class ResultadoIntegrationTest {
         HttpEntity<String> request = new HttpEntity<>(
                 "{\"titulo\":\"Pauta Resultado Integração\",\"descricao\":\"desc\"}", headers);
         ResponseEntity<JsonNode> response = restTemplate.postForEntity(baseUrl() + "/pautas", request, JsonNode.class);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         return response.getBody().get("id").asLong();
     }
 
@@ -63,7 +68,9 @@ class ResultadoIntegrationTest {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<String> request = new HttpEntity<>("{\"duracao_minutos\":30}", headers);
-        restTemplate.postForEntity(baseUrl() + "/pautas/" + pautaId + "/sessao", request, JsonNode.class);
+        ResponseEntity<JsonNode> response =
+                restTemplate.postForEntity(baseUrl() + "/pautas/" + pautaId + "/sessao", request, JsonNode.class);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     }
 
     private void votar(Long pautaId, long idAssociado, String voto) {
@@ -71,6 +78,8 @@ class ResultadoIntegrationTest {
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<String> request = new HttpEntity<>(
                 "{\"id_associado\":" + idAssociado + ",\"voto\":\"" + voto + "\"}", headers);
-        restTemplate.postForEntity(baseUrl() + "/pautas/" + pautaId + "/votos", request, JsonNode.class);
+        ResponseEntity<JsonNode> response =
+                restTemplate.postForEntity(baseUrl() + "/pautas/" + pautaId + "/votos", request, JsonNode.class);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     }
 }

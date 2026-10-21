@@ -7,9 +7,12 @@ import com.votacao.domain.sessao.StatusSessao;
 import com.votacao.domain.voto.TipoVoto;
 import com.votacao.domain.voto.VotoRepository;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ResultadoService {
@@ -30,11 +33,14 @@ public class ResultadoService {
         this.clock = clock;
     }
 
+    @Transactional(readOnly = true)
     public ResultadoResponse apurar(Long pautaId) {
         pautaService.buscarPorId(pautaId);
         Optional<Sessao> sessao = sessaoRepository.findByPautaId(pautaId);
 
-        StatusSessao statusSessao = derivarStatus(sessao);
+        Instant instante = clock.instant();
+        LocalDateTime agora = LocalDateTime.ofInstant(instante, clock.getZone());
+        StatusSessao statusSessao = derivarStatus(sessao, agora);
 
         long votosSim = 0L;
         long votosNao = 0L;
@@ -48,15 +54,14 @@ public class ResultadoService {
             }
         }
 
-        return new ResultadoResponse(
-                votosSim, votosNao, statusSessao, votosSim + votosNao, LocalDateTime.now(clock));
+        OffsetDateTime timestamp = OffsetDateTime.ofInstant(instante, clock.getZone());
+        return new ResultadoResponse(votosSim, votosNao, statusSessao, votosSim + votosNao, timestamp);
     }
 
-    private StatusSessao derivarStatus(Optional<Sessao> sessao) {
+    private StatusSessao derivarStatus(Optional<Sessao> sessao, LocalDateTime agora) {
         if (sessao.isEmpty()) {
             return StatusSessao.NAO_INICIADA;
         }
-        LocalDateTime agora = LocalDateTime.now(clock);
         return agora.isBefore(sessao.get().getFechamento()) ? StatusSessao.ABERTA : StatusSessao.EXPIRADA;
     }
 }
