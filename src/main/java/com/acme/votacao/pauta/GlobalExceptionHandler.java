@@ -88,6 +88,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(erro(HttpStatus.CONFLICT, ex.getMessage(), req.getRequestURI()));
     }
 
+    @ExceptionHandler(VotoDuplicadoException.class)
+    public ResponseEntity<ErroResponse> handleVotoDuplicado(VotoDuplicadoException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(erro(HttpStatus.CONFLICT, ex.getMessage(), req.getRequestURI()));
+    }
+
+    @ExceptionHandler(SessaoNaoAbertaException.class)
+    public ResponseEntity<ErroResponse> handleSessaoNaoAberta(SessaoNaoAbertaException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(erro(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), req.getRequestURI()));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErroResponse> handleGenerico(Exception ex, HttpServletRequest req) {
         log.error("Erro não tratado ao processar {} {}", req.getMethod(), req.getRequestURI(), ex);
