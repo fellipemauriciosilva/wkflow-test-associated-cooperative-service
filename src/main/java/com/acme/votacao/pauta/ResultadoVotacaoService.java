@@ -1,6 +1,7 @@
 package com.acme.votacao.pauta;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -22,6 +23,7 @@ public class ResultadoVotacaoService {
         this.clock = clock;
     }
 
+    @Transactional(readOnly = true)
     public ResultadoVotacaoResponse calcular(Long pautaId) {
         if (!pautaRepository.existsById(pautaId)) {
             throw new PautaNaoEncontradaException(pautaId);
