@@ -89,19 +89,34 @@ class PautaTest {
     }
 
     @Test
-    @DisplayName("aceita titulo com NBSP (U+00A0): nao e whitespace para isBlank/strip, decisao aceita")
-    void construtor_comTituloSoNbsp_criaPauta() {
-        var pauta = new Pauta("\u00A0", null);
-
-        assertThat(pauta.getTitulo()).isEqualTo("\u00A0");
+    @DisplayName("rejeita titulo somente com NBSP (U+00A0): nao e whitespace para "
+            + "isBlank/strip, mas e Zs (SPACE_SEPARATOR), tratado como 'sem caractere visivel'")
+    void construtor_comTituloSoNbsp_lancaExcecao() {
+        assertThatThrownBy(() -> new Pauta("\u00A0", null))
+                .isInstanceOf(PautaInvalidaException.class);
     }
 
     @Test
-    @DisplayName("aceita titulo com zero-width space (U+200B): nao e whitespace para isBlank/strip, decisao aceita")
-    void construtor_comTituloSoZeroWidthSpace_criaPauta() {
-        var pauta = new Pauta("\u200B", null);
+    @DisplayName("rejeita titulo somente com zero-width space (U+200B): categoria Cf "
+            + "(format), tratado como 'sem caractere visivel'")
+    void construtor_comTituloSoZeroWidthSpace_lancaExcecao() {
+        assertThatThrownBy(() -> new Pauta("\u200B", null))
+                .isInstanceOf(PautaInvalidaException.class);
+    }
 
-        assertThat(pauta.getTitulo()).isEqualTo("\u200B");
+    @Test
+    @DisplayName("rejeita titulo so com BOM/zero-width no-break space (U+FEFF)")
+    void construtor_comTituloSoBom_lancaExcecao() {
+        assertThatThrownBy(() -> new Pauta("\uFEFF", null))
+                .isInstanceOf(PautaInvalidaException.class);
+    }
+
+    @Test
+    @DisplayName("aceita NBSP e zero-width space quando ha pelo menos um caractere visivel no titulo")
+    void construtor_comTituloVisivelMaisInvisiveis_criaPauta() {
+        var pauta = new Pauta("titulo\u00A0com\u200Binvisiveis", null);
+
+        assertThat(pauta.getTitulo()).isEqualTo("titulo\u00A0com\u200Binvisiveis");
     }
 
     @Test

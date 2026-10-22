@@ -33,10 +33,8 @@ public class Pauta {
         this.descricao = descricao == null ? null : descricao.strip();
     }
 
-    // strip()/isBlank() usam Character.isWhitespace: NBSP e zero-width space nao contam
-    // como espaco e sobrevivem ao strip (decisao registrada em docs/CONTEXT.md).
     private static void validarTitulo(String titulo) {
-        if (titulo == null || titulo.isBlank()) {
+        if (titulo == null || titulo.isBlank() || !temCaractereVisivel(titulo)) {
             throw new PautaInvalidaException("titulo e obrigatorio");
         }
         var tituloStripado = titulo.strip();
@@ -44,6 +42,18 @@ public class Pauta {
             throw new PautaInvalidaException(
                     "titulo deve ter no maximo " + TITULO_TAMANHO_MAXIMO + " caracteres");
         }
+    }
+
+    // isBlank()/strip() usam Character.isWhitespace, que nao cobre NBSP nem categorias
+    // "invisiveis" como separadores Unicode (Zs/Zl/Zp) ou zero-width (Cf). Sem este check,
+    // um titulo so com esses caracteres passava como "nao vazio" e virava "titulo fantasma"
+    // (nada visivel na UI, mas tecnicamente preenchido) — achado do review de seguranca.
+    private static boolean temCaractereVisivel(String texto) {
+        return texto.codePoints().anyMatch(codePoint -> switch (Character.getType(codePoint)) {
+            case Character.SPACE_SEPARATOR, Character.LINE_SEPARATOR, Character.PARAGRAPH_SEPARATOR,
+                    Character.CONTROL, Character.FORMAT, Character.SURROGATE, Character.UNASSIGNED -> false;
+            default -> true;
+        });
     }
 
     private static void validarDescricao(String descricao) {
