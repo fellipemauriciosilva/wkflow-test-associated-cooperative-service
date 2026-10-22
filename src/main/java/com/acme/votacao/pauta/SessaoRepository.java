@@ -9,5 +9,7 @@ public interface SessaoRepository extends JpaRepository<Sessao, Long> {
 
     Optional<Sessao> findFirstByPautaIdAndFimAfter(Long pautaId, Instant agora);
 
+    Optional<Sessao> findFirstByPautaIdOrderByFimDesc(Long pautaId);
+
     long countByPautaId(Long pautaId);
 }

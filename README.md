@@ -1,6 +1,6 @@
 # votacao-pautas
 
-Cadastro e consulta de pautas (Fatia 1) e abertura de sessão de votação (Fatia 2) do épico Votação Pautas.
+Cadastro e consulta de pautas (Fatia 1), abertura de sessão de votação (Fatia 2) e registro de votos com resultado (Fatia 3) do épico Votação Pautas.
 
 ## Pré-requisitos
 
@@ -26,10 +26,14 @@ API disponível em `http://localhost:8080`.
 - `POST /pautas` — cria pauta. Body: `{"titulo": "string obrigatória", "descricao": "string opcional"}`. Retorna `201` com `{"id": 1}`. Payload inválido (titulo ausente/nulo/em branco, titulo ou descricao acima de 255 caracteres, JSON malformado) retorna `400`.
 - `GET /pautas/{id}` — retorna `200` com `{"id", "titulo", "descricao"}`, `404` se não existir, ou `400` se `{id}` não for numérico.
 - `POST /pautas/{id}/sessao` — abre sessão de votação para a pauta `{id}`. Body opcional `{"duracaoMinutos": <inteiro entre 1 e 1440>}`; ausente, `{}` ou `null` usam padrão de 1 minuto. Retorna `201` com `{"id", "pautaId", "inicio", "fim", "duracaoMinutos"}` (`inicio`/`fim` em ISO-8601 UTC). `404` se a pauta não existir. `409` se já existir sessão aberta para a pauta (`fim > agora`). `400` se `duracaoMinutos` for zero, negativo, maior que 1440, não inteiro ou de tipo inválido — nesses casos nenhuma sessão é criada. Reabertura após sessão encerrada é permitida (retorna `201`).
+- `POST /pautas/{id}/votos` — registra voto do associado na pauta `{id}`. Body: `{"associadoId": "string obrigatória, não vazia, até 255 caracteres", "voto": "SIM"|"NAO"}`. `associadoId` é normalizado (trim + lowercase) no construtor do DTO da requisição, antes de qualquer validação (`@Size` valida o valor já normalizado) ou checagem — `"associado-1"`, `"Associado-1"` e `" associado-1 "` são tratados como o mesmo associado. Retorna `201` com `{"id", "pautaId", "associadoId", "voto"}` (`associadoId` já normalizado). `400` se `voto` estiver ausente/fora de SIM/NAO, ou `associadoId` ausente/em branco/acima de 255 caracteres (limite aplicado sobre o valor já normalizado). `404` se a pauta não existir. `422` se não houver sessão aberta para a pauta (sessão inexistente, encerrada, ou `agora >= fim`) — checado antes do duplicado, então associado já votado com sessão fechada retorna `422`, não `409`. `409` se o associado já tiver votado nessa pauta (checado no serviço, atomicamente com a checagem de sessão e com um lock pessimista na pauta, que serializa chamadas concorrentes para a mesma pauta; reforçado pela constraint `UNIQUE (pauta_id, associado_id)` do banco).
+
+  **Risco proposto, aguardando aceite formal do PO:** `associadoId` é string livre no body, sem autenticação e sem verificação de elegibilidade/existência do associado. A constraint de unicidade impede repetir exatamente o mesmo `associadoId` normalizado na mesma pauta, mas não impede um cliente votar múltiplas vezes trocando o `associadoId` a cada chamada — a regra "um voto por associado" só vale se o chamador for honesto sobre sua própria identidade. Vincular identidade a autenticação real ou a uma lista de associados aptos está fora do escopo desta fatia (task.md, seção 2 — "fora"); mitigação completa exigiria pelo menos autenticação. Nenhum registro de aceite formal (nome, data, assinatura) existe no repositório — até existir, tratar como risco proposto, não decidido.
+- `GET /pautas/{id}/resultado` — retorna `200` com `{"pautaId", "totalSim", "totalNao", "status"}`. `status` é `ABERTA` (sessão existe e `agora < fim`), `ENCERRADA` (sessão existe e `agora >= fim`) ou `NAO_INICIADA` (pauta sem nenhuma sessão — totais sempre zero nesse caso). `404` se a pauta não existir.
 
 ### Corpo de erro (RF-12)
 
-Todos os erros da API — `400`/`404`/`409` nos dois recursos, mais `415` (Content-Type não suportado), `405` (método não suportado na rota), `406` (Accept não aceitável), `404` de rota inexistente e `500` (erro interno) — retornam o mesmo corpo padronizado:
+Todos os erros da API — `400`/`404`/`409`/`422` nos três recursos, mais `415` (Content-Type não suportado), `405` (método não suportado na rota), `406` (Accept não aceitável), `404` de rota inexistente e `500` (erro interno) — retornam o mesmo corpo padronizado:
 
 ```json
 {"timestamp": "2026-01-01T10:00:00Z", "status": 409, "error": "Conflict", "message": "Já existe sessão aberta para a pauta: 1", "path": "/pautas/1/sessao"}
