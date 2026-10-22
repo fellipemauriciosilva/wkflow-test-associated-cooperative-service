@@ -18,6 +18,11 @@ public class Sessao {
 
     public static final int DURACAO_PADRAO_MINUTOS = 1;
 
+    // Sem auth nem limite de tamanho de corpo que impeca isso: Integer aceita duracao de
+    // ~4000 anos, o que bloquearia a pauta com 409 indefinidamente (DoS funcional). Teto
+    // de 1440 min (24h) e um valor de trabalho ate confirmar com PO; ver docs/CONTEXT.md.
+    public static final int DURACAO_MAXIMA_MINUTOS = 1440;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -49,6 +54,10 @@ public class Sessao {
     public static void validarDuracao(Integer duracaoMinutos) {
         if (duracaoMinutos == null || duracaoMinutos <= 0) {
             throw new SessaoInvalidaException("duracao deve ser maior que zero");
+        }
+        if (duracaoMinutos > DURACAO_MAXIMA_MINUTOS) {
+            throw new SessaoInvalidaException(
+                    "duracao deve ser no maximo " + DURACAO_MAXIMA_MINUTOS + " minutos");
         }
     }
 

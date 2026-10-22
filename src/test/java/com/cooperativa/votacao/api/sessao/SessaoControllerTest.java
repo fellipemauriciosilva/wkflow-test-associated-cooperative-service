@@ -7,7 +7,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.cooperativa.votacao.application.pauta.PautaService;
 import java.time.Clock;
 import java.time.Instant;
-import java.time.ZoneOffset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -157,7 +156,7 @@ class SessaoControllerTest {
 
     @Test
     @DisplayName("sessao encerrada nao bloqueia nova abertura para a mesma pauta")
-    void abrir_apoSessaoEncerrada_permiteNovaAbertura() throws Exception {
+    void abrir_aposSessaoEncerrada_permiteNovaAbertura() throws Exception {
         org.mockito.Mockito.when(clock.instant())
                 .thenReturn(T0)
                 .thenReturn(T0.plusSeconds(120));

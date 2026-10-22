@@ -3,6 +3,9 @@ package com.cooperativa.votacao.application.sessao;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.cooperativa.votacao.domain.pauta.Pauta;
@@ -48,7 +51,7 @@ class SessaoServiceTest {
     @Test
     @DisplayName("abre sessao com duracao informada")
     void abrir_comDuracaoInformada_abreSessaoComDuracaoInformada() {
-        when(pautaRepository.buscarPorId(1L)).thenReturn(Optional.of(pauta));
+        when(pautaRepository.buscarPorIdComLock(1L)).thenReturn(Optional.of(pauta));
         when(sessaoRepository.buscarPorPautaId(1L)).thenReturn(List.of());
         when(sessaoRepository.salvar(any(Sessao.class))).thenAnswer(invocacao -> invocacao.getArgument(0));
 
@@ -62,7 +65,7 @@ class SessaoServiceTest {
     @Test
     @DisplayName("duracao nula assume 1 minuto")
     void abrir_comDuracaoNula_assumeUmMinuto() {
-        when(pautaRepository.buscarPorId(1L)).thenReturn(Optional.of(pauta));
+        when(pautaRepository.buscarPorIdComLock(1L)).thenReturn(Optional.of(pauta));
         when(sessaoRepository.buscarPorPautaId(1L)).thenReturn(List.of());
         when(sessaoRepository.salvar(any(Sessao.class))).thenAnswer(invocacao -> invocacao.getArgument(0));
 
@@ -76,12 +79,14 @@ class SessaoServiceTest {
     void abrir_comDuracaoInvalida_lancaExcecaoSemConsultarPauta() {
         assertThatThrownBy(() -> sut.abrir(1L, 0)).isInstanceOf(SessaoInvalidaException.class);
         assertThatThrownBy(() -> sut.abrir(1L, -1)).isInstanceOf(SessaoInvalidaException.class);
+
+        verifyNoInteractions(pautaRepository);
     }
 
     @Test
     @DisplayName("pauta inexistente lanca PautaNaoEncontradaException")
     void abrir_comPautaInexistente_lancaExcecao() {
-        when(pautaRepository.buscarPorId(999L)).thenReturn(Optional.empty());
+        when(pautaRepository.buscarPorIdComLock(999L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> sut.abrir(999L, 5)).isInstanceOf(PautaNaoEncontradaException.class);
     }
@@ -90,17 +95,19 @@ class SessaoServiceTest {
     @DisplayName("sessao ja aberta para a pauta lanca SessaoJaAbertaException")
     void abrir_comSessaoJaAberta_lancaExcecao() {
         var sessaoAberta = new Sessao(pauta, 10, AGORA.minusSeconds(60));
-        when(pautaRepository.buscarPorId(1L)).thenReturn(Optional.of(pauta));
+        when(pautaRepository.buscarPorIdComLock(1L)).thenReturn(Optional.of(pauta));
         when(sessaoRepository.buscarPorPautaId(1L)).thenReturn(List.of(sessaoAberta));
 
         assertThatThrownBy(() -> sut.abrir(1L, 5)).isInstanceOf(SessaoJaAbertaException.class);
+
+        verify(sessaoRepository, never()).salvar(any());
     }
 
     @Test
     @DisplayName("sessao encerrada nao bloqueia nova abertura")
     void abrir_comSessaoEncerrada_abreNovaSessao() {
         var sessaoEncerrada = new Sessao(pauta, 1, AGORA.minusSeconds(120));
-        when(pautaRepository.buscarPorId(1L)).thenReturn(Optional.of(pauta));
+        when(pautaRepository.buscarPorIdComLock(1L)).thenReturn(Optional.of(pauta));
         when(sessaoRepository.buscarPorPautaId(1L)).thenReturn(List.of(sessaoEncerrada));
         when(sessaoRepository.salvar(any(Sessao.class))).thenAnswer(invocacao -> invocacao.getArgument(0));
 
