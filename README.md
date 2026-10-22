@@ -71,16 +71,22 @@ Abre sessão de votação para a pauta `{id}`. Request:
 
 - `201 Created` com `id`, `pautaId`, `duracaoMinutos`, `abertura`, `fimEm` quando aberta com
   sucesso. `duracaoMinutos` ausente, `null`, ou corpo ausente assume 1 minuto.
-- `400 Bad Request` quando `duracaoMinutos` é <= 0, não inteiro (ex. `"abc"`, `1.5`) ou JSON
-  malformado.
+- `400 Bad Request` quando `duracaoMinutos` é <= 0, acima do teto de 1440 minutos (24h), não
+  inteiro (ex. `"abc"`, `1.5`, `"5"` — string numérica também é rejeitada, não coagida) ou
+  JSON malformado.
 - `404 Not Found` quando a pauta `{id}` não existe.
 - `409 Conflict` quando a pauta já tem uma sessão aberta (fim ainda não alcançado). Sessão
   encerrada não bloqueia nova abertura (reabertura de sessão encerrada é fora de escopo desta
   fatia — ver `docs/CONTEXT.md`).
+- `413 Payload Too Large`, `415 Unsupported Media Type`, `405 Method Not Allowed`: mesmo
+  comportamento de `/pautas` (ver acima).
 
 Ordem de validação: corpo (400) → pauta existe (404) → sessão aberta (409). Instante de
 abertura vem de um `java.time.Clock` injetável (bean `Clock.systemUTC()` em produção,
-substituível por `Clock.fixed(...)` em testes).
+substituível por `Clock.fixed(...)` ou `@MockBean` em testes). A checagem de sessão aberta
+roda dentro de uma transação com lock pessimista (`PESSIMISTIC_WRITE`) na pauta, para que
+duas requisições concorrentes para a mesma pauta não abram duas sessões (ver
+`docs/CONTEXT.md`, Convenções).
 
 ### Formato de erro (400, 404, 409, 413, 415, 405)
 
