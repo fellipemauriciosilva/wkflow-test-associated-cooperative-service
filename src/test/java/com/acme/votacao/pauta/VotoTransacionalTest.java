@@ -1,5 +1,7 @@
 package com.acme.votacao.pauta;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,13 +34,16 @@ class VotoTransacionalTest {
     @Mock
     private VotoRepository votoRepository;
 
+    @Mock
+    private EntityManager entityManager;
+
     private final Clock clock = Clock.fixed(AGORA, ZoneOffset.UTC);
 
     private VotoTransacional sut;
 
     @BeforeEach
     void setUp() {
-        sut = new VotoTransacional(sessaoRepository, votoRepository, clock, new GanchoConcorrenciaVotoNoOp());
+        sut = new VotoTransacional(sessaoRepository, votoRepository, entityManager, clock, new GanchoConcorrenciaVotoNoOp());
     }
 
     @Test

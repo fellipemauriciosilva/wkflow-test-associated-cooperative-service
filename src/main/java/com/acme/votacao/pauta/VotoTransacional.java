@@ -1,5 +1,7 @@
 package com.acme.votacao.pauta;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -9,9 +11,17 @@ import java.time.Instant;
 
 /**
  * Checagem de sessão aberta, checagem de duplicado e insert do voto, atomicamente na
- * mesma transação (isolamento READ_COMMITTED, mesmo padrão de
- * {@link SessaoService#abrir}) — elimina a janela em que duas chamadas concorrentes
- * veriam ambas "sem voto" antes de qualquer insert.
+ * mesma transação (isolamento READ_COMMITTED, mesmo padrão de {@link SessaoService#abrir}).
+ * <p>
+ * O lock {@code PESSIMISTIC_WRITE} na linha de {@link Pauta}, adquirido antes das duas
+ * checagens, serializa chamadas concorrentes para a mesma pauta: a segunda só adquire o
+ * lock depois do commit (ou rollback) da primeira, e nesse ponto sua leitura de sessão e
+ * de duplicado já reflete o resultado da primeira (READ_COMMITTED garante que a leitura,
+ * feita depois do lock, não usa um snapshot anterior a ele). Isso fecha a janela em que
+ * duas chamadas concorrentes veriam ambas "sessão aberta, sem voto prévio" antes de
+ * qualquer insert — sem o lock, só a constraint UNIQUE do banco bloquearia o duplicado
+ * (ainda corretamente, mas no insert, não na checagem), e a janela de sessão fechando
+ * entre a leitura do relógio e o commit continuaria aberta.
  * <p>
  * Separado de {@link VotoService} (que não é transacional) de propósito: se o insert
  * falhar por {@code DataIntegrityViolationException}, {@link VotoService} precisa
@@ -23,23 +33,29 @@ import java.time.Instant;
  * {@code VotoService.votar}.
  */
 @Component
-class VotoTransacional {
+public class VotoTransacional {
 
     private final SessaoRepository sessaoRepository;
     private final VotoRepository votoRepository;
+    private final EntityManager entityManager;
     private final Clock clock;
     private final GanchoConcorrenciaVoto ganchoConcorrencia;
 
-    VotoTransacional(SessaoRepository sessaoRepository, VotoRepository votoRepository, Clock clock,
-                      GanchoConcorrenciaVoto ganchoConcorrencia) {
+    VotoTransacional(SessaoRepository sessaoRepository, VotoRepository votoRepository, EntityManager entityManager,
+                      Clock clock, GanchoConcorrenciaVoto ganchoConcorrencia) {
         this.sessaoRepository = sessaoRepository;
         this.votoRepository = votoRepository;
+        this.entityManager = entityManager;
         this.clock = clock;
         this.ganchoConcorrencia = ganchoConcorrencia;
     }
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
-    Voto registrar(Long pautaId, String associadoId, VotoValor votoValor) {
+    public Voto registrar(Long pautaId, String associadoId, VotoValor votoValor) {
+        ganchoConcorrencia.antesDeSalvar(pautaId, associadoId);
+
+        entityManager.find(Pauta.class, pautaId, LockModeType.PESSIMISTIC_WRITE);
+
         Instant agora = Instant.now(clock);
         if (sessaoRepository.findFirstByPautaIdAndFimAfter(pautaId, agora).isEmpty()) {
             throw new SessaoNaoAbertaException(pautaId);
@@ -48,8 +64,6 @@ class VotoTransacional {
         if (votoRepository.existsByPautaIdAndAssociadoId(pautaId, associadoId)) {
             throw new VotoDuplicadoException(pautaId, associadoId);
         }
-
-        ganchoConcorrencia.antesDeSalvar(pautaId, associadoId);
 
         return votoRepository.save(new Voto(pautaId, associadoId, votoValor, agora));
     }

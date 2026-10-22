@@ -3,8 +3,6 @@ package com.acme.votacao.pauta;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
-import java.util.Locale;
-
 @Service
 public class VotoService {
 
@@ -28,10 +26,13 @@ public class VotoService {
      * um voto passar depois de {@code fim} ou dois votos concorrentes passarem ambos
      * pela checagem otimista (violação de AC-3.3 e RF-07, respectivamente).
      * <p>
-     * {@code associadoId} é normalizado (trim + lowercase) antes de qualquer checagem e
-     * antes do save: sem isso, "associado-1", "associado-1 " e "Associado-1" seriam três
-     * linhas distintas e a regra de "um voto por associado" seria burlável só variando a
-     * string (decisão de normalização registrada em docs/CONTEXT.md).
+     * {@code associadoId} chega já normalizado (trim + lowercase, feito no construtor
+     * compacto de {@link VotoRequest}, não aqui): sem isso, "associado-1", "associado-1 "
+     * e "Associado-1" seriam três linhas distintas e a regra de "um voto por associado"
+     * seria burlável só variando a string. Normalizar no DTO (antes do {@code @Size})
+     * evita que um valor bruto fora do limite mas normalizado dentro dele seja rejeitado
+     * por engano, e evita que a expansão de um caractere ao virar minúsculo (ex.
+     * {@code İ}, U+0130) só seja detectada tarde, pelo banco.
      * <p>
      * Se o insert falhar por {@link DataIntegrityViolationException} (constraint UNIQUE
      * sob concorrência real — a checagem otimista dentro da transação não viu o voto da
@@ -47,7 +48,7 @@ public class VotoService {
             throw new PautaNaoEncontradaException(pautaId);
         }
 
-        String associadoId = normalizar(request.associadoId());
+        String associadoId = request.associadoId();
         try {
             return votoTransacional.registrar(pautaId, associadoId, request.voto());
         } catch (DataIntegrityViolationException e) {
@@ -56,9 +57,5 @@ public class VotoService {
             }
             throw e;
         }
-    }
-
-    private String normalizar(String associadoId) {
-        return associadoId.trim().toLowerCase(Locale.ROOT);
     }
 }
