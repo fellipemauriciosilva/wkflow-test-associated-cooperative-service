@@ -20,11 +20,13 @@ public class VotoService {
     /**
      * Ordem de validação (definida no task.md da Fatia 3): 400 (payload, via @Valid no
      * controller, antes deste método) → 404 (pauta) → 422 (sessão não aberta) → 409
-     * (voto duplicado). Checagem de sessão, checagem de duplicado e insert ocorrem
-     * atomicamente em {@link VotoTransacional#registrar} (mesma transação,
-     * READ_COMMITTED) — sem essa atomicidade, a janela entre o check e o save deixaria
-     * um voto passar depois de {@code fim} ou dois votos concorrentes passarem ambos
-     * pela checagem otimista (violação de AC-3.3 e RF-07, respectivamente).
+     * (voto duplicado). Checagem de sessão, checagem de duplicado e insert ocorrem na
+     * mesma transação em {@link VotoTransacional#registrar}, atrás de um lock
+     * pessimista na pauta (mesma transação, READ_COMMITTED) — sem o lock, duas chamadas
+     * concorrentes poderiam ambas passar pela checagem otimista antes de qualquer
+     * insert, e só a constraint UNIQUE do banco (ver catch abaixo) impediria o
+     * duplicado de fato; com o lock, a segunda chamada só lê sessão/duplicado depois do
+     * commit (ou rollback) da primeira.
      * <p>
      * {@code associadoId} chega já normalizado (trim + lowercase, feito no construtor
      * compacto de {@link VotoRequest}, não aqui): sem isso, "associado-1", "associado-1 "

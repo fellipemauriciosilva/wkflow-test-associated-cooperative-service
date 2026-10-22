@@ -21,8 +21,7 @@ public record VotoRequest(
         VotoValor voto
 ) {
 
-    public VotoRequest(String associadoId, VotoValor voto) {
-        this.associadoId = associadoId == null ? null : associadoId.trim().toLowerCase(Locale.ROOT);
-        this.voto = voto;
+    public VotoRequest {
+        associadoId = associadoId == null ? null : associadoId.trim().toLowerCase(Locale.ROOT);
     }
 }

@@ -60,7 +60,9 @@
   - Normalização (trim + lowercase) de `associadoId` movida do corpo de `VotoService.votar` para o construtor compacto de `VotoRequest`: `@Size(max=255)` agora valida o valor já normalizado, não o bruto.
   - README e CONTEXT.md reescritos para não atribuir ao PO uma decisão sem registro de aceite formal no repositório (normalização e risco de `associadoId` sem autenticação, ambos agora "proposto"/"sem aceite", não "decidido").
   - Clausula de Convenções sobre `countByPautaIdAndVoto`/índice reescrita: o índice cobre o acesso por `pauta_id`, mas o filtro de `voto` é feito no heap, não pelo índice.
-  - Testes novos: `VotoControllerTest` com `associadoId` de 256 caracteres brutos que normaliza para dentro do limite (espera 201); `associadoId` com caractere U+0130 repetido 255 vezes (espera 400 ou 201 explícito, nunca 500); `VotoTransacionalTest`/`VotoControllerTest` ajustados para o novo parâmetro `EntityManager` de `VotoTransacional`.
+  - Testes novos: `VotoControllerTest` com `associadoId` de 256 caracteres brutos que normaliza para dentro do limite (espera 201); `associadoId` com caractere U+0130 repetido 255 vezes (espera 201 ou 400, nunca 500); `VotoTransacionalTest`/`VotoControllerTest` ajustados para o novo parâmetro `EntityManager` de `VotoTransacional`.
+  - `GanchoConcorrenciaVoto.antesDeSalvar` passou a ser chamado **antes** do lock pessimista (não antes do insert como no ciclo 3): colocar a barreira de teste depois do lock causava deadlock (lock timeout do H2) porque a primeira thread ficava presa esperando a segunda enquanto já segurava o lock de `Pauta`. Com a barreira antes do lock, as duas chamadas concorrentes disputam o lock de fato — o que o teste de concorrência precisa provar.
+  - Suite completa após o ciclo 4: 81 testes, `mvnd test` → BUILD SUCCESS (confirmado nesta sessão).
 
 ## Armadilhas
 

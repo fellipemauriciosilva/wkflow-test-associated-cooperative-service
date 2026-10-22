@@ -287,6 +287,36 @@ class VotoControllerTest {
     }
 
     @Test
+    @DisplayName("associadoId com 256 caracteres brutos mas 254 após trim das bordas retorna 201 (limite vale sobre o valor normalizado)")
+    void votar_associadoIdCom256CaracteresBrutosMas254AposTrim_retorna201() throws Exception {
+        abrirSessao(5);
+        String associadoId = " " + "a".repeat(254) + " ";
+        assertThat(associadoId).hasSize(256);
+        String payload = "{\"associadoId\": \"" + associadoId + "\", \"voto\": \"SIM\"}";
+
+        mockMvc.perform(post("/pautas/{id}/votos", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.associadoId").value("a".repeat(254)));
+    }
+
+    @Test
+    @DisplayName("associadoId com U+0130 repetido 255 vezes expande ao normalizar (lowercase) e nunca retorna 500")
+    void votar_associadoIdComCaractereQueExpandeAoNormalizar_nuncaRetorna500() throws Exception {
+        abrirSessao(5);
+        String associadoId = "İ".repeat(255);
+        String payload = "{\"associadoId\": \"" + associadoId + "\", \"voto\": \"SIM\"}";
+
+        int status = mockMvc.perform(post("/pautas/{id}/votos", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andReturn().getResponse().getStatus();
+
+        assertThat(status).isIn(201, 400);
+    }
+
+    @Test
     @DisplayName("associadoId com espaços e caixa diferente é tratado como o mesmo associado (normalização) e retorna 409")
     void votar_associadoIdComEspacosEMaiusculas_tratadoComoMesmoAssociado_retorna409() throws Exception {
         abrirSessao(5);
