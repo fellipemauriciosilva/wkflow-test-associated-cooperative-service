@@ -56,6 +56,26 @@ class VotoTest {
     }
 
     @Test
+    @DisplayName("aceita associado com 50 emojis (code points), nao conta como 100 UTF-16 units")
+    void construtor_comAssociadoComEmojisNoLimite_criaVoto() {
+        var associadoComEmojis = "😀".repeat(Voto.ASSOCIADO_TAMANHO_MAXIMO);
+
+        var voto = new Voto(pauta, associadoComEmojis, TipoVoto.SIM);
+
+        assertThat(voto.getAssociado().codePointCount(0, voto.getAssociado().length()))
+                .isEqualTo(Voto.ASSOCIADO_TAMANHO_MAXIMO);
+    }
+
+    @Test
+    @DisplayName("rejeita associado com 51 emojis (code points) acima do limite")
+    void construtor_comAssociadoComEmojisAcimaDoLimite_lancaExcecao() {
+        var associadoComEmojis = "😀".repeat(Voto.ASSOCIADO_TAMANHO_MAXIMO + 1);
+
+        assertThatThrownBy(() -> new Voto(pauta, associadoComEmojis, TipoVoto.SIM))
+                .isInstanceOf(VotoInvalidoException.class);
+    }
+
+    @Test
     @DisplayName("rejeita tipo de voto nulo")
     void construtor_comTipoVotoNulo_lancaExcecao() {
         assertThatThrownBy(() -> new Voto(pauta, "associado-1", null))

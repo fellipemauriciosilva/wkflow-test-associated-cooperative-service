@@ -82,6 +82,15 @@ class VotoServiceTest {
     }
 
     @Test
+    @DisplayName("Ordem 404 antes de 400: pauta inexistente com associado invalido ainda lanca PautaNaoEncontradaException")
+    void registrar_comPautaInexistenteEAssociadoInvalido_lancaPautaNaoEncontrada() {
+        when(pautaRepository.buscarPorId(999999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> sut.registrar(999999L, null, TipoVoto.SIM))
+                .isInstanceOf(PautaNaoEncontradaException.class);
+    }
+
+    @Test
     @DisplayName("AC-3.9: associado nulo retorna VotoInvalidoException")
     void registrar_comAssociadoNulo_lancaExcecao() {
         when(pautaRepository.buscarPorId(1L)).thenReturn(Optional.of(pauta));
@@ -146,6 +155,34 @@ class VotoServiceTest {
                 .thenThrow(new DataIntegrityViolationException("uk_voto_associado_pauta"));
 
         assertThatThrownBy(() -> sut.registrar(1L, "associado-A", TipoVoto.SIM))
+                .isInstanceOf(VotoDuplicadoException.class);
+    }
+
+    @Test
+    @DisplayName("Catch da constraint nao mascara outra DataIntegrityViolationException: deve propagar, nao virar 409")
+    void registrar_comViolacaoDeOutraColuna_relanca() {
+        when(pautaRepository.buscarPorId(1L)).thenReturn(Optional.of(pauta));
+        when(sessaoRepository.buscarPorPautaId(1L))
+                .thenReturn(List.of(new Sessao(pauta, 5, ABERTURA)));
+        when(votoRepository.buscarPorPautaId(1L)).thenReturn(List.of());
+        when(votoRepository.salvar(any(Voto.class)))
+                .thenThrow(new DataIntegrityViolationException("NULL not allowed for column \"TIPO_VOTO\""));
+
+        assertThatThrownBy(() -> sut.registrar(1L, "associado-A", TipoVoto.SIM))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .isNotInstanceOf(VotoDuplicadoException.class);
+    }
+
+    @Test
+    @DisplayName("AC-3.5: duplicata detectada apos strip - 'associado-A ' colide com 'associado-A' ja votado")
+    void registrar_comAssociadoComEspacoQueJaVotouStripado_lancaExcecao() {
+        when(pautaRepository.buscarPorId(1L)).thenReturn(Optional.of(pauta));
+        when(sessaoRepository.buscarPorPautaId(1L))
+                .thenReturn(List.of(new Sessao(pauta, 5, ABERTURA)));
+        when(votoRepository.buscarPorPautaId(1L))
+                .thenReturn(List.of(new Voto(pauta, "associado-A", TipoVoto.SIM)));
+
+        assertThatThrownBy(() -> sut.registrar(1L, "associado-A ", TipoVoto.NAO))
                 .isInstanceOf(VotoDuplicadoException.class);
     }
 
