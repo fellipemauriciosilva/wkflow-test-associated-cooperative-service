@@ -43,7 +43,8 @@ Request:
 - `413 Payload Too Large` quando o body excede 16 KB, mesmo sem `Content-Length` confiável
   (`TamanhoMaximoBodyFilter`, ver "Segurança" abaixo).
 - `415 Unsupported Media Type` quando `Content-Type` não é `application/json`.
-- `405 Method Not Allowed` quando o método HTTP não é suportado pela rota.
+- `405 Method Not Allowed` quando o método HTTP não é suportado pela rota (resposta inclui o
+  header `Allow` com os métodos aceitos, conforme RFC 9110).
 
 Limites de tamanho usam `codePointCount`, não `length()`, então 200 emojis são aceitos como
 título (`length()` seria 400 por serem surrogate pairs). Validação de espaço em branco usa
@@ -83,5 +84,8 @@ Nenhuma necessária nesta fatia (H2 em memória, sem segredos).
   `Content-Length` já declara acima do limite, e um `HttpServletRequestWrapper` que conta
   bytes efetivamente lidos do `InputStream` e interrompe a leitura ao estourar o limite —
   cobre chunked transfer encoding e requisições sem `Content-Length` confiável, onde o header
-  sozinho não protegeria nada (gap identificado em review de segurança e corrigido; ver
-  `docs/CONTEXT.md`).
+  sozinho não protegeria nada (gap identificado em review de segurança e corrigido). O 413
+  foi confirmado de ponta a ponta com um teste e2e que fala HTTP/1.1 chunked via socket cru
+  contra um servidor real (`CorpoExcedeTamanhoMaximoE2ETest`) — não só contra o filtro
+  isolado. HTTP/2 não foi testado. Detalhes da correção e do bug que ela fechou (Jackson
+  mascarando o limite como "400 JSON inválido" no caminho real) em `docs/CONTEXT.md`.
