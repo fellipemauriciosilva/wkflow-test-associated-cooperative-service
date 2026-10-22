@@ -23,4 +23,9 @@ public class PautaRepositoryImpl implements PautaRepository {
     public Optional<Pauta> buscarPorId(Long id) {
         return jpaRepository.findById(id);
     }
+
+    @Override
+    public Optional<Pauta> buscarPorIdComLock(Long id) {
+        return jpaRepository.buscarPorIdComLock(id);
+    }
 }
