@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import(TestClockConfig.class)
+@Import({TestClockConfig.class, TestGanchoConcorrenciaConfig.class})
 class SessaoControllerTest {
 
     @Autowired
@@ -43,6 +43,9 @@ class SessaoControllerTest {
 
     @Autowired
     private MutableClock clock;
+
+    @Autowired
+    private GanchoConcorrenciaSessaoControlavel gancho;
 
     private Long pautaId;
 
@@ -107,17 +110,33 @@ class SessaoControllerTest {
     }
 
     @Test
-    @DisplayName("POST /pautas/{id}/sessao repetido enquanto sessão está aberta retorna 409")
+    @DisplayName("POST /pautas/{id}/sessao repetido enquanto sessão está aberta retorna 409 com corpo padronizado")
     void abrir_sessaoJaAberta_retorna409() throws Exception {
         mockMvc.perform(post("/pautas/{id}/sessao", pautaId)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isCreated());
 
+        clock.definir(Instant.parse("2026-01-01T10:00:30Z"));
+
         mockMvc.perform(post("/pautas/{id}/sessao", pautaId)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.error").value("Conflict"))
+                .andExpect(jsonPath("$.message").value("Já existe sessão aberta para a pauta: " + pautaId))
+                .andExpect(jsonPath("$.timestamp").value("2026-01-01T10:00:30Z"))
                 .andExpect(jsonPath("$.path").value("/pautas/" + pautaId + "/sessao"));
+    }
+
+    @Test
+    @DisplayName("ErroResponse.timestamp vem do Clock injetado, não do relógio real")
+    void erro_timestamp_vemDoClockInjetado() throws Exception {
+        clock.definir(Instant.parse("2030-05-20T15:30:00Z"));
+
+        mockMvc.perform(post("/pautas/{id}/sessao", 999999L)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.timestamp").value("2030-05-20T15:30:00Z"));
     }
 
     @Test
@@ -191,6 +210,87 @@ class SessaoControllerTest {
     }
 
     @Test
+    @DisplayName("POST /pautas/{id}/sessao com duracaoMinutos acima do teto (Integer.MAX_VALUE) retorna 400 e não cria sessão")
+    void abrir_duracaoAcimaDoTeto_retorna400ENaoCriaSessao() throws Exception {
+        String payload = """
+                {"duracaoMinutos": 2147483647}
+                """;
+
+        mockMvc.perform(post("/pautas/{id}/sessao", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isBadRequest());
+
+        assertThat(sessaoRepository.countByPautaId(pautaId)).isZero();
+    }
+
+    @Test
+    @DisplayName("POST /pautas/{id}/sessao com duracaoMinutos no teto (1440) retorna 201")
+    void abrir_duracaoNoTeto_retorna201() throws Exception {
+        String payload = """
+                {"duracaoMinutos": 1440}
+                """;
+
+        mockMvc.perform(post("/pautas/{id}/sessao", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.duracaoMinutos").value(1440));
+    }
+
+    @Test
+    @DisplayName("POST /pautas/{id}/sessao com duracaoMinutos acima do teto por pouco (1441) retorna 400")
+    void abrir_duracaoAcimaDoTetoPorPouco_retorna400() throws Exception {
+        String payload = """
+                {"duracaoMinutos": 1441}
+                """;
+
+        mockMvc.perform(post("/pautas/{id}/sessao", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isBadRequest());
+
+        assertThat(sessaoRepository.countByPautaId(pautaId)).isZero();
+    }
+
+    @Test
+    @DisplayName("POST com Content-Type não suportado retorna 415 com corpo padronizado")
+    void abrir_tipoMidiaNaoSuportado_retorna415ComCorpoPadronizado() throws Exception {
+        mockMvc.perform(post("/pautas/{id}/sessao", pautaId)
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("duracaoMinutos=5"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.status").value(415))
+                .andExpect(jsonPath("$.error").value("Unsupported Media Type"))
+                .andExpect(jsonPath("$.path").value("/pautas/" + pautaId + "/sessao"))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("Método HTTP não suportado na rota retorna 405 com corpo padronizado")
+    void abrir_metodoNaoSuportado_retorna405ComCorpoPadronizado() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(
+                        "/pautas/{id}/sessao", pautaId))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(jsonPath("$.status").value(405))
+                .andExpect(jsonPath("$.error").value("Method Not Allowed"))
+                .andExpect(jsonPath("$.path").value("/pautas/" + pautaId + "/sessao"))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("Rota inexistente retorna 404 com corpo padronizado")
+    void rotaInexistente_retorna404ComCorpoPadronizado() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                        "/rota-que-nao-existe"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.error").value("Not Found"))
+                .andExpect(jsonPath("$.path").value("/rota-que-nao-existe"))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty());
+    }
+
+    @Test
     @DisplayName("POST /pautas/{id}/sessao após fim da sessão anterior permite reabertura com 201")
     void abrir_sessaoAnteriorEncerrada_permiteReaberturaCom201() throws Exception {
         mockMvc.perform(post("/pautas/{id}/sessao", pautaId)
@@ -206,38 +306,49 @@ class SessaoControllerTest {
     }
 
     @Test
-    @DisplayName("duas aberturas concorrentes para a mesma pauta: exatamente uma sucede com 201, a outra recebe 409")
+    @DisplayName("duas aberturas concorrentes para a mesma pauta: exatamente uma sucede com 201, a outra recebe 409, e a segunda fica bloqueada até a primeira liberar o lock")
     void abrir_duasChamadasConcorrentes_exatamenteUmaSucede() throws Exception {
+        gancho.reset();
         ExecutorService executor = Executors.newFixedThreadPool(2);
-        CountDownLatch largada = new CountDownLatch(1);
+        try {
+            Future<Integer> tarefa1 = executor.submit(() -> abrirChamando());
+            gancho.aguardarPrimeiraChegada();
 
-        Future<Integer> tarefa1 = executor.submit(() -> abrirAguardandoLargada(largada));
-        Future<Integer> tarefa2 = executor.submit(() -> abrirAguardandoLargada(largada));
+            Future<Integer> tarefa2 = executor.submit(() -> abrirChamando());
 
-        largada.countDown();
+            // Tarefa1 está retida no gancho, dentro da transação, com o lock pessimista
+            // ainda tomado. Se o lock não bloqueasse a segunda transação, ela chegaria ao
+            // gancho mesmo com a primeira retida — então esta asserção falha sem o lock.
+            Thread.sleep(200);
+            assertThat(gancho.segundaChegou())
+                    .as("segunda transação não deveria alcançar o gancho enquanto a primeira está retida com o lock")
+                    .isFalse();
 
-        int status1 = tarefa1.get(10, TimeUnit.SECONDS);
-        int status2 = tarefa2.get(10, TimeUnit.SECONDS);
-        executor.shutdown();
+            gancho.liberarPrimeira();
 
-        AtomicInteger sucessos = new AtomicInteger();
-        AtomicInteger conflitos = new AtomicInteger();
-        for (int status : new int[]{status1, status2}) {
-            if (status == 201) {
-                sucessos.incrementAndGet();
-            } else if (status == 409) {
-                conflitos.incrementAndGet();
+            int status1 = tarefa1.get(10, TimeUnit.SECONDS);
+            int status2 = tarefa2.get(10, TimeUnit.SECONDS);
+
+            AtomicInteger sucessos = new AtomicInteger();
+            AtomicInteger conflitos = new AtomicInteger();
+            for (int status : new int[]{status1, status2}) {
+                if (status == 201) {
+                    sucessos.incrementAndGet();
+                } else if (status == 409) {
+                    conflitos.incrementAndGet();
+                }
             }
-        }
 
-        assertThat(sucessos.get()).isEqualTo(1);
-        assertThat(conflitos.get()).isEqualTo(1);
-        assertThat(sessaoRepository.countByPautaId(pautaId)).isEqualTo(1);
+            assertThat(sucessos.get()).isEqualTo(1);
+            assertThat(conflitos.get()).isEqualTo(1);
+            assertThat(sessaoRepository.countByPautaId(pautaId)).isEqualTo(1);
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
-    private int abrirAguardandoLargada(CountDownLatch largada) {
+    private int abrirChamando() {
         try {
-            largada.await();
             return mockMvc.perform(post("/pautas/{id}/sessao", pautaId)
                             .contentType(MediaType.APPLICATION_JSON))
                     .andReturn()

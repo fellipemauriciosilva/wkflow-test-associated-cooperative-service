@@ -38,7 +38,7 @@ class SessaoServiceTest {
 
     @BeforeEach
     void setUp() {
-        sut = new SessaoService(sessaoRepository, entityManager, clock);
+        sut = new SessaoService(sessaoRepository, entityManager, clock, new GanchoConcorrenciaSessaoNoOp());
     }
 
     @Test
