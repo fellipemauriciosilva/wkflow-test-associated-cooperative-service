@@ -72,4 +72,65 @@ class PautaTest {
 
         assertThat(pauta.getTitulo()).isEqualTo("titulo com espacos");
     }
+
+    @Test
+    @DisplayName("remove em space (U+2003) nas extremidades do titulo, pois e whitespace Unicode")
+    void construtor_comTituloComEmSpace_removeEspacosExtremidades() {
+        var pauta = new Pauta("\u2003titulo com em space\u2003", null);
+
+        assertThat(pauta.getTitulo()).isEqualTo("titulo com em space");
+    }
+
+    @Test
+    @DisplayName("rejeita titulo somente com em space (U+2003), pois e whitespace Unicode")
+    void construtor_comTituloSoEmSpace_lancaExcecao() {
+        assertThatThrownBy(() -> new Pauta("\u2003\u2003", null))
+                .isInstanceOf(PautaInvalidaException.class);
+    }
+
+    @Test
+    @DisplayName("aceita titulo com NBSP (U+00A0): nao e whitespace para isBlank/strip, decisao aceita")
+    void construtor_comTituloSoNbsp_criaPauta() {
+        var pauta = new Pauta("\u00A0", null);
+
+        assertThat(pauta.getTitulo()).isEqualTo("\u00A0");
+    }
+
+    @Test
+    @DisplayName("aceita titulo com zero-width space (U+200B): nao e whitespace para isBlank/strip, decisao aceita")
+    void construtor_comTituloSoZeroWidthSpace_criaPauta() {
+        var pauta = new Pauta("\u200B", null);
+
+        assertThat(pauta.getTitulo()).isEqualTo("\u200B");
+    }
+
+    @Test
+    @DisplayName("aceita titulo com 200 emojis (code points), nao conta como 400 UTF-16 units")
+    void construtor_comTituloComEmojisNoLimite_criaPauta() {
+        var tituloComEmojis = "😀".repeat(Pauta.TITULO_TAMANHO_MAXIMO);
+
+        var pauta = new Pauta(tituloComEmojis, null);
+
+        assertThat(pauta.getTitulo().codePointCount(0, pauta.getTitulo().length()))
+                .isEqualTo(Pauta.TITULO_TAMANHO_MAXIMO);
+    }
+
+    @Test
+    @DisplayName("rejeita titulo com 201 emojis (code points) acima do limite")
+    void construtor_comTituloComEmojisAcimaDoLimite_lancaExcecao() {
+        var tituloComEmojis = "😀".repeat(Pauta.TITULO_TAMANHO_MAXIMO + 1);
+
+        assertThatThrownBy(() -> new Pauta(tituloComEmojis, null))
+                .isInstanceOf(PautaInvalidaException.class);
+    }
+
+    @Test
+    @DisplayName("aceita descricao no limite exato do tamanho maximo")
+    void construtor_comDescricaoNoLimite_criaPauta() {
+        var descricaoNoLimite = "a".repeat(Pauta.DESCRICAO_TAMANHO_MAXIMO);
+
+        var pauta = new Pauta("titulo valido", descricaoNoLimite);
+
+        assertThat(pauta.getDescricao()).hasSize(Pauta.DESCRICAO_TAMANHO_MAXIMO);
+    }
 }

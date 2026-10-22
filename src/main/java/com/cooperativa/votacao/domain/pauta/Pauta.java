@@ -29,22 +29,29 @@ public class Pauta {
     public Pauta(String titulo, String descricao) {
         validarTitulo(titulo);
         validarDescricao(descricao);
-        this.titulo = titulo.trim();
-        this.descricao = descricao;
+        this.titulo = titulo.strip();
+        this.descricao = descricao == null ? null : descricao.strip();
     }
 
+    // strip()/isBlank() usam Character.isWhitespace: NBSP e zero-width space nao contam
+    // como espaco e sobrevivem ao strip (decisao registrada em docs/CONTEXT.md).
     private static void validarTitulo(String titulo) {
         if (titulo == null || titulo.isBlank()) {
             throw new PautaInvalidaException("titulo e obrigatorio");
         }
-        if (titulo.trim().length() > TITULO_TAMANHO_MAXIMO) {
+        var tituloStripado = titulo.strip();
+        if (tituloStripado.codePointCount(0, tituloStripado.length()) > TITULO_TAMANHO_MAXIMO) {
             throw new PautaInvalidaException(
                     "titulo deve ter no maximo " + TITULO_TAMANHO_MAXIMO + " caracteres");
         }
     }
 
     private static void validarDescricao(String descricao) {
-        if (descricao != null && descricao.length() > DESCRICAO_TAMANHO_MAXIMO) {
+        if (descricao == null) {
+            return;
+        }
+        var descricaoStripada = descricao.strip();
+        if (descricaoStripada.codePointCount(0, descricaoStripada.length()) > DESCRICAO_TAMANHO_MAXIMO) {
             throw new PautaInvalidaException(
                     "descricao deve ter no maximo " + DESCRICAO_TAMANHO_MAXIMO + " caracteres");
         }
