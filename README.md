@@ -29,13 +29,15 @@ API disponível em `http://localhost:8080`.
 
 ### Corpo de erro (RF-12)
 
-Todos os erros da API — `400`/`404`/`409` nos dois recursos, mais `415` (Content-Type não suportado), `405` (método não suportado na rota), `404` de rota inexistente e `500` (erro interno) — retornam o mesmo corpo padronizado:
+Todos os erros da API — `400`/`404`/`409` nos dois recursos, mais `415` (Content-Type não suportado), `405` (método não suportado na rota), `406` (Accept não aceitável), `404` de rota inexistente e `500` (erro interno) — retornam o mesmo corpo padronizado:
 
 ```json
 {"timestamp": "2026-01-01T10:00:00Z", "status": 409, "error": "Conflict", "message": "Já existe sessão aberta para a pauta: 1", "path": "/pautas/1/sessao"}
 ```
 
-`message` em erros de validação (`400`) é construído só a partir de `field` + mensagem de validação de cada campo rejeitado — nunca com `exception.getMessage()` bruto, para não expor nomes de classe/método internos do Spring ao cliente.
+`message` em erros de validação (`400`) é construído só a partir de `field` + mensagem de validação de cada campo rejeitado — nunca com `exception.getMessage()` bruto, para não expor nomes de classe/método internos do Spring ao cliente. `500` tem mensagem fixa ("erro interno inesperado"), nunca o texto da exceção.
+
+`GlobalExceptionHandler` estende `ResponseEntityExceptionHandler` (não usa só `@ExceptionHandler(Exception.class)` avulso) e sobrescreve `handleExceptionInternal`, preservando o status que o próprio Spring MVC já calculou para suas exceções (`MissingServletRequestParameterException` → 400, `HttpMediaTypeNotAcceptableException` → 406, etc.) em vez de um catch-all genérico convertê-las em 500 antes do resolver padrão do framework agir. Para exceções detectadas na negociação de conteúdo (ex. `HttpMediaTypeNotAcceptableException`, quando o `Accept` do cliente não aceita nada que o servidor produza), o corpo de erro é escrito diretamente na resposta via `ObjectMapper`, bypassando os message converters — deixar a negociação de conteúdo decidir como serializar o próprio corpo de erro reproduziria o mesmo erro na escrita da resposta de erro. `PautaControllerTest` cobre 406 (`Accept: application/xml`) e 400 de parâmetro obrigatório ausente contra um controller só de teste (`DiagnosticoTestController`), e `SessaoControllerTest` cobre 500 forçando uma `RuntimeException` via gancho de teste.
 
 ### Teto de duração de sessão
 
@@ -45,7 +47,7 @@ Todos os erros da API — `400`/`404`/`409` nos dois recursos, mais `415` (Conte
 
 Duas requisições concorrentes de abertura de sessão para a mesma pauta usam lock pessimista (`SELECT ... FOR UPDATE` via `EntityManager.find` com `PESSIMISTIC_WRITE`) na linha de `Pauta` dentro da transação, com isolamento **fixado explicitamente em `READ_COMMITTED`** (`@Transactional(isolation = Isolation.READ_COMMITTED)` em `SessaoService.abrir`, independente do default do datasource). A segunda transação só adquire o lock após o commit da primeira e, nesse ponto, já enxerga a sessão recém-criada — garantindo que só uma abertura por vez sucede (a outra recebe `409`). Sem constraint de unicidade simples na tabela, porque reabertura após fechamento é permitida.
 
-Essa garantia depende do isolamento ser READ_COMMITTED (default do H2 e do Postgres, mas **não universal**): em REPEATABLE READ/SERIALIZABLE, o snapshot da transação pode ser fixado na própria instrução com lock, fazendo a segunda transação não ver a sessão da primeira mesmo após o commit — por isso o isolamento é fixado explicitamente no método, não deixado como "o que o datasource usar por padrão". O teste `SessaoControllerTest.abrir_duasChamadasConcorrentes_exatamenteUmaSucede` usa um gancho de teste (`GanchoConcorrenciaSessaoControlavel`) para forçar a sobreposição real das duas transações e provar que, sem o lock, a segunda transação alcança o ponto pós-lock enquanto a primeira ainda está retida — comportamento que o lock impede.
+Essa garantia depende do isolamento ser READ_COMMITTED (default do H2 e do Postgres, mas **não universal**): em REPEATABLE READ/SERIALIZABLE, o snapshot da transação pode ser fixado na própria instrução com lock, fazendo a segunda transação não ver a sessão da primeira mesmo após o commit — por isso o isolamento é fixado explicitamente no método, não deixado como "o que o datasource usar por padrão". O teste `SessaoControllerTest.abrir_duasChamadasConcorrentes_exatamenteUmaSucede` usa um gancho de teste (`GanchoConcorrenciaSessaoControlavel`) para forçar a sobreposição real das duas transações e provar que, sem o lock, a segunda transação alcança o ponto pós-lock enquanto a primeira ainda está retida — comportamento que o lock impede. O mesmo teste também lê `TransactionSynchronizationManager.getCurrentTransactionIsolationLevel()` dentro do gancho (guardado num `AtomicReference`, asserido na thread do teste) e confirma que o nível efetivo é `ISOLATION_READ_COMMITTED` — essa parte prova que a anotação `@Transactional(isolation = ...)` está de fato em vigor, não o comportamento do banco sob outro isolamento (isso exigiria um teste separado forçando REPEATABLE READ, fora do escopo desta fatia).
 
 ### Limite de tamanho de titulo/descricao
 
