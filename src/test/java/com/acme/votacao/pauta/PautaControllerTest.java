@@ -105,4 +105,99 @@ class PautaControllerTest {
                         .content(payload))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    @DisplayName("POST /pautas com titulo de 256 caracteres retorna 400")
+    void criar_tituloAcimaDoLimite_retorna400() throws Exception {
+        String titulo = "a".repeat(256);
+        String payload = objectMapper.writeValueAsString(new PautaRequest(titulo, null));
+
+        mockMvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("POST /pautas com titulo de exatamente 255 caracteres retorna 201")
+    void criar_tituloNoLimite_retorna201() throws Exception {
+        String titulo = "a".repeat(255);
+        String payload = objectMapper.writeValueAsString(new PautaRequest(titulo, null));
+
+        mockMvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("POST /pautas com descricao de 256 caracteres retorna 400")
+    void criar_descricaoAcimaDoLimite_retorna400() throws Exception {
+        String descricao = "a".repeat(256);
+        String payload = objectMapper.writeValueAsString(new PautaRequest("Titulo válido", descricao));
+
+        mockMvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("POST /pautas com descricao de exatamente 255 caracteres retorna 201")
+    void criar_descricaoNoLimite_retorna201() throws Exception {
+        String descricao = "a".repeat(255);
+        String payload = objectMapper.writeValueAsString(new PautaRequest("Titulo válido", descricao));
+
+        mockMvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    @DisplayName("POST /pautas: 255 caracteres multi-byte (acentuados) no titulo retorna 201")
+    void criar_tituloComCaracteresMultiByteNoLimite_retorna201() throws Exception {
+        // "é" é 1 unidade UTF-16 (code unit) mas 2 bytes em UTF-8: confirma que o limite
+        // conta code units (String.length()), não bytes.
+        String titulo = "é".repeat(255);
+        String payload = objectMapper.writeValueAsString(new PautaRequest(titulo, null));
+
+        mockMvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    @DisplayName("POST /pautas: emoji (par substituto) levando titulo a 256 code units retorna 400")
+    void criar_tituloComSurrogatePairAcimaDoLimite_retorna400() throws Exception {
+        // "😀" ocupa 2 code units (par substituto) em UTF-16: 128 emojis = 256 code units,
+        // acima do limite de 255 mesmo com só 128 "caracteres visuais".
+        String titulo = "😀".repeat(128);
+        String payload = objectMapper.writeValueAsString(new PautaRequest(titulo, null));
+
+        mockMvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("POST /pautas com corpo JSON malformado retorna 400")
+    void criar_jsonMalformado_retorna400() throws Exception {
+        String payload = "{\"titulo\": \"Reforma\", \"descricao\": ";
+
+        mockMvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("GET /pautas/{id} com id não numérico retorna 400")
+    void buscarPorId_idNaoNumerico_retorna400() throws Exception {
+        mockMvc.perform(get("/pautas/{id}", "abc"))
+                .andExpect(status().isBadRequest());
+    }
 }

@@ -1,5 +1,6 @@
 package com.acme.votacao.pauta;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,7 +23,7 @@ class PautaServiceTest {
 
     private PautaService sut;
 
-    @org.junit.jupiter.api.BeforeEach
+    @BeforeEach
     void setUp() {
         sut = new PautaService(pautaRepository);
     }
@@ -31,17 +32,18 @@ class PautaServiceTest {
     @DisplayName("deve criar pauta e persistir via repositório")
     void criar_persisteEPautaRetornada() {
         var request = new PautaRequest("Reforma do estatuto", "Discussão sobre regras internas");
-        var pautaSalva = new Pauta("Reforma do estatuto", "Discussão sobre regras internas");
+        // valores diferentes do request: garante que as asserções abaixo não coincidem por acaso
+        var pautaSalva = new Pauta("Reforma do estatuto (persistida)", "Discussão sobre regras internas (persistida)");
         when(pautaRepository.save(org.mockito.ArgumentMatchers.any(Pauta.class))).thenReturn(pautaSalva);
 
         var resultado = sut.criar(request);
 
-        assertThat(resultado.getTitulo()).isEqualTo("Reforma do estatuto");
-        assertThat(resultado.getDescricao()).isEqualTo("Discussão sobre regras internas");
-
         ArgumentCaptor<Pauta> captor = ArgumentCaptor.forClass(Pauta.class);
         verify(pautaRepository).save(captor.capture());
         assertThat(captor.getValue().getTitulo()).isEqualTo("Reforma do estatuto");
+        assertThat(captor.getValue().getDescricao()).isEqualTo("Discussão sobre regras internas");
+
+        assertThat(resultado).isSameAs(pautaSalva);
     }
 
     @Test

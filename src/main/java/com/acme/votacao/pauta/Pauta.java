@@ -1,5 +1,6 @@
 package com.acme.votacao.pauta;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -12,8 +13,10 @@ public class Pauta {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false, length = 255)
     private String titulo;
 
+    @Column(length = 255)
     private String descricao;
 
     protected Pauta() {
