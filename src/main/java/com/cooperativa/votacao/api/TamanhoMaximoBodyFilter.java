@@ -66,6 +66,9 @@ public class TamanhoMaximoBodyFilter implements Filter {
     private static final class RequisicaoComLimiteDeBytes extends HttpServletRequestWrapper {
 
         private final long limiteBytes;
+        // Cacheado: sem isso, cada chamada a getInputStream() cria um contador zerado sobre
+        // o MESMO stream subjacente, permitindo ler o limite inteiro de novo a cada chamada.
+        private ServletInputStream streamContado;
 
         RequisicaoComLimiteDeBytes(HttpServletRequest request, long limiteBytes) {
             super(request);
@@ -74,7 +77,22 @@ public class TamanhoMaximoBodyFilter implements Filter {
 
         @Override
         public ServletInputStream getInputStream() throws IOException {
-            return new StreamComLimiteDeBytes(super.getInputStream(), limiteBytes);
+            if (streamContado == null) {
+                streamContado = new StreamComLimiteDeBytes(super.getInputStream(), limiteBytes);
+            }
+            return streamContado;
+        }
+
+        // HttpServletRequestWrapper.getReader() por padrao delega pro request original,
+        // ignorando o wrapper — qualquer consumidor que leia por aqui (em vez de
+        // getInputStream()) furava o limite. Forcar via getInputStream() garante a mesma
+        // contagem nos dois caminhos.
+        @Override
+        public java.io.BufferedReader getReader() throws IOException {
+            var charset = getCharacterEncoding() != null
+                    ? getCharacterEncoding()
+                    : java.nio.charset.StandardCharsets.UTF_8.name();
+            return new java.io.BufferedReader(new java.io.InputStreamReader(getInputStream(), charset));
         }
     }
 

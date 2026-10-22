@@ -1,6 +1,7 @@
 package com.cooperativa.votacao.api.pauta;
 
 import static org.hamcrest.Matchers.notNullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -216,14 +217,15 @@ class PautaControllerTest {
     }
 
     @Test
-    @DisplayName("DELETE /pautas/{id} (metodo nao suportado) retorna 405 com ErroResponse")
+    @DisplayName("DELETE /pautas/{id} (metodo nao suportado) retorna 405 com ErroResponse e header Allow")
     void deletarPauta_metodoNaoSuportado_retorna405() throws Exception {
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                        .delete("/pautas/{id}", 1))
+        mockMvc.perform(delete("/pautas/{id}", 1))
                 .andExpect(status().isMethodNotAllowed())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value(405))
-                .andExpect(jsonPath("$.mensagem").value("metodo nao suportado"));
+                .andExpect(jsonPath("$.mensagem").value("metodo nao suportado"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .header().exists("Allow"));
     }
 
     private record PautaRequestTeste(String titulo, String descricao) {
