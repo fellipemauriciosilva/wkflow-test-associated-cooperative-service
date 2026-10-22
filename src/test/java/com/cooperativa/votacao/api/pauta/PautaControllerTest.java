@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.cooperativa.votacao.api.TamanhoMaximoBodyFilter;
 import com.cooperativa.votacao.domain.pauta.Pauta;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
@@ -126,7 +127,7 @@ class PautaControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.mensagem", notNullValue()));
+                .andExpect(jsonPath("$.mensagem").value("corpo da requisicao invalido ou ausente"));
     }
 
     @Test
@@ -136,11 +137,11 @@ class PautaControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.mensagem", notNullValue()));
+                .andExpect(jsonPath("$.mensagem").value("parametro 'id' invalido"));
     }
 
     @Test
-    @DisplayName("POST /pautas com body acima do limite retorna 413")
+    @DisplayName("POST /pautas com body acima do limite retorna 413 com ErroResponse")
     void criar_comBodyMuitoGrande_retorna413() throws Exception {
         var descricaoEnorme = "a".repeat(20_000);
         var payload = objectMapper.writeValueAsString(new PautaRequestTeste("titulo valido", descricaoEnorme));
@@ -148,7 +149,26 @@ class PautaControllerTest {
         mockMvc.perform(post("/pautas")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
-                .andExpect(status().isPayloadTooLarge());
+                .andExpect(status().isPayloadTooLarge())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(413))
+                .andExpect(jsonPath("$.mensagem")
+                        .value("corpo da requisicao excede o tamanho maximo permitido"));
+    }
+
+    @Test
+    @DisplayName("POST /pautas com body 1 byte acima do limite retorna 413")
+    void criar_comBodyUmByteAcimaDoLimite_retorna413() throws Exception {
+        var prefixo = "{\"titulo\":\"titulo valido\",\"descricao\":\"";
+        var sufixo = "\"}";
+        var padding = (int) TamanhoMaximoBodyFilter.TAMANHO_MAXIMO_BYTES - prefixo.length() - sufixo.length() + 1;
+        var payload = prefixo + "a".repeat(padding) + sufixo;
+
+        mockMvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isPayloadTooLarge())
+                .andExpect(jsonPath("$.status").value(413));
     }
 
     @Test

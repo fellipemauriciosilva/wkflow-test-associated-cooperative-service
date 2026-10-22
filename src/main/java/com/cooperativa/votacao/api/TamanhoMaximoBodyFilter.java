@@ -2,10 +2,13 @@ package com.cooperativa.votacao.api;
 
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
+import jakarta.servlet.ReadListener;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletInputStream;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import org.springframework.http.HttpStatus;
@@ -13,10 +16,11 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 
 /**
- * Rejeita requisicoes com body acima do limite antes de chegar ao controller, evitando
- * desserializar payloads grandes em memoria so para falhar na validacao de dominio.
- * Checa apenas o header Content-Length: nao protege contra chunked transfer encoding sem
- * esse header (fora de escopo desta fatia, ver docs/CONTEXT.md).
+ * Rejeita requisicoes com body acima do limite antes de o controller terminar de le-lo.
+ * Duas camadas: rejeicao imediata se o header Content-Length ja declara um valor acima do
+ * limite (evita ate comecar a ler), e um wrapper que conta bytes efetivamente lidos do
+ * InputStream e interrompe a leitura ao estourar o limite — cobre requisicoes chunked ou
+ * sem Content-Length, onde o header sozinho nao protege nada.
  */
 @Component
 public class TamanhoMaximoBodyFilter implements Filter {
@@ -34,13 +38,95 @@ public class TamanhoMaximoBodyFilter implements Filter {
             return;
         }
 
-        chain.doFilter(request, response);
+        var requisicaoComLimite = new RequisicaoComLimiteDeBytes(httpRequest, TAMANHO_MAXIMO_BYTES);
+        try {
+            chain.doFilter(requisicaoComLimite, response);
+        } catch (CorpoExcedeTamanhoMaximoException ex) {
+            responderPayloadTooLarge(httpResponse);
+        }
     }
 
     private void responderPayloadTooLarge(HttpServletResponse response) throws IOException {
+        if (response.isCommitted()) {
+            return;
+        }
+        response.reset();
         response.setStatus(HttpStatus.PAYLOAD_TOO_LARGE.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.getWriter().write(
                 "{\"status\":413,\"mensagem\":\"corpo da requisicao excede o tamanho maximo permitido\"}");
+    }
+
+    /** Lancada pelo stream ao ultrapassar o limite durante a leitura; nao e IOException de
+     * proposito, pois Jackson converte IOException em HttpMessageNotReadableException (400)
+     * antes de chegar ao filtro — precisa atravessar essa camada sem ser traduzida. */
+    static final class CorpoExcedeTamanhoMaximoException extends RuntimeException {
+    }
+
+    private static final class RequisicaoComLimiteDeBytes extends HttpServletRequestWrapper {
+
+        private final long limiteBytes;
+
+        RequisicaoComLimiteDeBytes(HttpServletRequest request, long limiteBytes) {
+            super(request);
+            this.limiteBytes = limiteBytes;
+        }
+
+        @Override
+        public ServletInputStream getInputStream() throws IOException {
+            return new StreamComLimiteDeBytes(super.getInputStream(), limiteBytes);
+        }
+    }
+
+    private static final class StreamComLimiteDeBytes extends ServletInputStream {
+
+        private final ServletInputStream delegate;
+        private final long limiteBytes;
+        private long bytesLidos = 0;
+
+        StreamComLimiteDeBytes(ServletInputStream delegate, long limiteBytes) {
+            this.delegate = delegate;
+            this.limiteBytes = limiteBytes;
+        }
+
+        @Override
+        public int read() throws IOException {
+            var lido = delegate.read();
+            if (lido != -1) {
+                contar(1);
+            }
+            return lido;
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+            var lidos = delegate.read(b, off, len);
+            if (lidos > 0) {
+                contar(lidos);
+            }
+            return lidos;
+        }
+
+        private void contar(int lidos) {
+            bytesLidos += lidos;
+            if (bytesLidos > limiteBytes) {
+                throw new CorpoExcedeTamanhoMaximoException();
+            }
+        }
+
+        @Override
+        public boolean isFinished() {
+            return delegate.isFinished();
+        }
+
+        @Override
+        public boolean isReady() {
+            return delegate.isReady();
+        }
+
+        @Override
+        public void setReadListener(ReadListener readListener) {
+            delegate.setReadListener(readListener);
+        }
     }
 }
