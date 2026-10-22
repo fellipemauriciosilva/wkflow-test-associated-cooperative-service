@@ -145,6 +145,32 @@ class VotoControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isUnprocessableEntity());
+
+        assertThat(votoRepository.countByPautaId(pautaId)).isZero();
+    }
+
+    @Test
+    @DisplayName("Ordem 422 antes de 409: associado já votado e sessão fechada retorna 422, não 409")
+    void votar_associadoJaVotadoComSessaoFechada_retorna422EmVezDe409() throws Exception {
+        abrirSessao(1);
+        String payload = """
+                {"associadoId": "associado-1", "voto": "SIM"}
+                """;
+
+        mockMvc.perform(post("/pautas/{id}/votos", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isCreated());
+
+        clock.definir(Instant.parse("2026-01-01T10:01:30Z"));
+
+        mockMvc.perform(post("/pautas/{id}/votos", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.status").value(422));
+
+        assertThat(votoRepository.countByPautaId(pautaId)).isEqualTo(1);
     }
 
     @Test
@@ -229,6 +255,59 @@ class VotoControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("associadoId com 255 caracteres (limite) retorna 201")
+    void votar_associadoIdCom255Caracteres_retorna201() throws Exception {
+        abrirSessao(5);
+        String associadoId = "a".repeat(255);
+        String payload = "{\"associadoId\": \"" + associadoId + "\", \"voto\": \"SIM\"}";
+
+        mockMvc.perform(post("/pautas/{id}/votos", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.associadoId").value(associadoId));
+    }
+
+    @Test
+    @DisplayName("associadoId com 256 caracteres (acima do limite) retorna 400")
+    void votar_associadoIdCom256Caracteres_retorna400() throws Exception {
+        abrirSessao(5);
+        String associadoId = "a".repeat(256);
+        String payload = "{\"associadoId\": \"" + associadoId + "\", \"voto\": \"SIM\"}";
+
+        mockMvc.perform(post("/pautas/{id}/votos", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isBadRequest());
+
+        assertThat(votoRepository.countByPautaId(pautaId)).isZero();
+    }
+
+    @Test
+    @DisplayName("associadoId com espaços e caixa diferente é tratado como o mesmo associado (normalização) e retorna 409")
+    void votar_associadoIdComEspacosEMaiusculas_tratadoComoMesmoAssociado_retorna409() throws Exception {
+        abrirSessao(5);
+        String payloadOriginal = """
+                {"associadoId": "associado-1", "voto": "SIM"}
+                """;
+        String payloadVariante = """
+                {"associadoId": "Associado-1 ", "voto": "NAO"}
+                """;
+
+        mockMvc.perform(post("/pautas/{id}/votos", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payloadOriginal))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/pautas/{id}/votos", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payloadVariante))
+                .andExpect(status().isConflict());
+
+        assertThat(votoRepository.countByPautaId(pautaId)).isEqualTo(1);
     }
 
     @Test
