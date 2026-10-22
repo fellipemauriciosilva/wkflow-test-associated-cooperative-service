@@ -60,7 +60,11 @@ public class TamanhoMaximoBodyFilter implements Filter {
     /** Lancada pelo stream ao ultrapassar o limite durante a leitura; nao e IOException de
      * proposito, pois Jackson converte IOException em HttpMessageNotReadableException (400)
      * antes de chegar ao filtro — precisa atravessar essa camada sem ser traduzida. */
-    static final class CorpoExcedeTamanhoMaximoException extends RuntimeException {
+    // Publica: precisa ser referenciavel de com.cooperativa.votacao.api.pauta, onde
+    // PautaExceptionHandler desembrulha a cadeia de causas de HttpMessageNotReadableException
+    // (Jackson embrulha qualquer exececao de leitura do stream nessa, antes do Spring MVC
+    // decidir qual @ExceptionHandler chamar — ver PautaExceptionHandler.tratarJsonInvalido).
+    public static final class CorpoExcedeTamanhoMaximoException extends RuntimeException {
     }
 
     private static final class RequisicaoComLimiteDeBytes extends HttpServletRequestWrapper {

@@ -1,6 +1,7 @@
 package com.cooperativa.votacao.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletInputStream;
@@ -107,6 +108,19 @@ class TamanhoMaximoBodyFilterTest {
                 .isLessThanOrEqualTo(TamanhoMaximoBodyFilter.TAMANHO_MAXIMO_BYTES);
     }
 
+    @Test
+    @DisplayName("exececao nao relacionada ao limite propaga inalterada pelo filtro, sem virar 413")
+    void excecaoNaoRelacionadaAoLimite_propagaInalterada() throws Exception {
+        var corpoDentroDoLimite = "a".repeat(10).getBytes(StandardCharsets.UTF_8);
+        var request = new RequisicaoSemContentLength(corpoDentroDoLimite);
+        var response = new MockHttpServletResponse();
+        var chainQueLancaOutraExcecao = new ChainQueLancaExcecaoNaoRelacionada();
+
+        assertThatThrownBy(() -> filtro.doFilter(request, response, chainQueLancaOutraExcecao))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("falha nao relacionada ao limite de body");
+    }
+
     /** Simula o cenario do bypass: getContentLengthLong() retorna -1 mesmo com body presente,
      * como acontece em requisicoes chunked sem header Content-Length. */
     private static final class RequisicaoSemContentLength extends MockHttpServletRequest {
@@ -172,6 +186,15 @@ class TamanhoMaximoBodyFilterTest {
             while ((lidos = segundaChamada.read(buffer)) != -1) {
                 totalBytesLidos += lidos;
             }
+        }
+    }
+
+    /** Lanca uma excecao qualquer, nao relacionada ao limite de body. */
+    private static final class ChainQueLancaExcecaoNaoRelacionada implements FilterChain {
+
+        @Override
+        public void doFilter(jakarta.servlet.ServletRequest request, jakarta.servlet.ServletResponse response) {
+            throw new IllegalStateException("falha nao relacionada ao limite de body");
         }
     }
 

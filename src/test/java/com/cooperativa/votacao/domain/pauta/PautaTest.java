@@ -34,7 +34,8 @@ class PautaTest {
     @DisplayName("rejeita titulo nulo, vazio ou somente espacos")
     void construtor_comTituloInvalido_lancaExcecao(String titulo) {
         assertThatThrownBy(() -> new Pauta(titulo, "descricao qualquer"))
-                .isInstanceOf(PautaInvalidaException.class);
+                .isInstanceOf(PautaInvalidaException.class)
+                .hasMessage("titulo e obrigatorio");
     }
 
     @Test
@@ -85,7 +86,8 @@ class PautaTest {
     @DisplayName("rejeita titulo somente com em space (U+2003), pois e whitespace Unicode")
     void construtor_comTituloSoEmSpace_lancaExcecao() {
         assertThatThrownBy(() -> new Pauta("\u2003\u2003", null))
-                .isInstanceOf(PautaInvalidaException.class);
+                .isInstanceOf(PautaInvalidaException.class)
+                .hasMessage("titulo e obrigatorio");
     }
 
     @Test
@@ -93,7 +95,8 @@ class PautaTest {
             + "isBlank/strip, mas e Zs (SPACE_SEPARATOR), tratado como 'sem caractere visivel'")
     void construtor_comTituloSoNbsp_lancaExcecao() {
         assertThatThrownBy(() -> new Pauta("\u00A0", null))
-                .isInstanceOf(PautaInvalidaException.class);
+                .isInstanceOf(PautaInvalidaException.class)
+                .hasMessage("titulo e obrigatorio");
     }
 
     @Test
@@ -101,14 +104,56 @@ class PautaTest {
             + "(format), tratado como 'sem caractere visivel'")
     void construtor_comTituloSoZeroWidthSpace_lancaExcecao() {
         assertThatThrownBy(() -> new Pauta("\u200B", null))
-                .isInstanceOf(PautaInvalidaException.class);
+                .isInstanceOf(PautaInvalidaException.class)
+                .hasMessage("titulo e obrigatorio");
     }
 
     @Test
     @DisplayName("rejeita titulo so com BOM/zero-width no-break space (U+FEFF)")
     void construtor_comTituloSoBom_lancaExcecao() {
         assertThatThrownBy(() -> new Pauta("\uFEFF", null))
-                .isInstanceOf(PautaInvalidaException.class);
+                .isInstanceOf(PautaInvalidaException.class)
+                .hasMessage("titulo e obrigatorio");
+    }
+
+    @Test
+    @DisplayName("rejeita titulo so com line separator (U+2028): categoria Zl")
+    void construtor_comTituloSoLineSeparator_lancaExcecao() {
+        assertThatThrownBy(() -> new Pauta("\u2028", null))
+                .isInstanceOf(PautaInvalidaException.class)
+                .hasMessage("titulo e obrigatorio");
+    }
+
+    @Test
+    @DisplayName("rejeita titulo so com paragraph separator (U+2029): categoria Zp")
+    void construtor_comTituloSoParagraphSeparator_lancaExcecao() {
+        assertThatThrownBy(() -> new Pauta("\u2029", null))
+                .isInstanceOf(PautaInvalidaException.class)
+                .hasMessage("titulo e obrigatorio");
+    }
+
+    @Test
+    @DisplayName("rejeita titulo so com caractere de controle (U+0085, NEL): categoria Cc")
+    void construtor_comTituloSoControle_lancaExcecao() {
+        assertThatThrownBy(() -> new Pauta("\u0085", null))
+                .isInstanceOf(PautaInvalidaException.class)
+                .hasMessage("titulo e obrigatorio");
+    }
+
+    @Test
+    @DisplayName("rejeita titulo so com code point nao atribuido (U+0378): categoria UNASSIGNED")
+    void construtor_comTituloSoNaoAtribuido_lancaExcecao() {
+        assertThatThrownBy(() -> new Pauta("\u0378", null))
+                .isInstanceOf(PautaInvalidaException.class)
+                .hasMessage("titulo e obrigatorio");
+    }
+
+    @Test
+    @DisplayName("rejeita titulo so com surrogate solitario (U+D800): categoria SURROGATE")
+    void construtor_comTituloSoSurrogateSolitario_lancaExcecao() {
+        assertThatThrownBy(() -> new Pauta("\uD800", null))
+                .isInstanceOf(PautaInvalidaException.class)
+                .hasMessage("titulo e obrigatorio");
     }
 
     @Test
