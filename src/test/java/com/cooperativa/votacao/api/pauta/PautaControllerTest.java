@@ -196,11 +196,34 @@ class PautaControllerTest {
     @Test
     @DisplayName("GET /pautas/{id} com pauta inexistente retorna 404")
     void buscarPorId_comPautaInexistente_retorna404() throws Exception {
-        mockMvc.perform(get("/pautas/{id}", Long.MAX_VALUE))
+        mockMvc.perform(get("/pautas/{id}", 999999))
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.mensagem").value("Pauta nao encontrada"));
+    }
+
+    @Test
+    @DisplayName("POST /pautas com Content-Type nao suportado retorna 415 com ErroResponse")
+    void criar_comContentTypeNaoSuportado_retorna415() throws Exception {
+        mockMvc.perform(post("/pautas")
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("titulo=qualquer"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(415))
+                .andExpect(jsonPath("$.mensagem").value("content-type nao suportado"));
+    }
+
+    @Test
+    @DisplayName("DELETE /pautas/{id} (metodo nao suportado) retorna 405 com ErroResponse")
+    void deletarPauta_metodoNaoSuportado_retorna405() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .delete("/pautas/{id}", 1))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(405))
+                .andExpect(jsonPath("$.mensagem").value("metodo nao suportado"));
     }
 
     private record PautaRequestTeste(String titulo, String descricao) {
