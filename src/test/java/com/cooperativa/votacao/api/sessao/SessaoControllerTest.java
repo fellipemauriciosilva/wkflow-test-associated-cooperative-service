@@ -1,10 +1,15 @@
 package com.cooperativa.votacao.api.sessao;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.cooperativa.votacao.api.TamanhoMaximoBodyFilter;
 import com.cooperativa.votacao.application.pauta.PautaService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +33,9 @@ class SessaoControllerTest {
 
     @Autowired
     private PautaService pautaService;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @MockBean
     private Clock clock;
@@ -174,5 +182,94 @@ class SessaoControllerTest {
                                 {"duracaoMinutos": 1}
                                 """))
                 .andExpect(status().isCreated());
+    }
+
+    @Test
+    @DisplayName("POST /pautas/{id}/sessao com body acima do limite retorna 413 com $.status")
+    void abrir_comBodyMuitoGrande_retorna413() throws Exception {
+        org.mockito.Mockito.when(clock.instant()).thenReturn(T0);
+        var payloadGigante = objectMapper.writeValueAsString(
+                new SessaoRequestComCampoExtra(5, "a".repeat(20_000)));
+
+        mockMvc.perform(post("/pautas/{id}/sessao", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payloadGigante))
+                .andExpect(status().isPayloadTooLarge())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(413));
+    }
+
+    @Test
+    @DisplayName("POST /pautas/abc/sessao (id nao numerico) retorna 400 com ErroResponse")
+    void abrir_comIdNaoNumerico_retorna400() throws Exception {
+        mockMvc.perform(post("/pautas/{id}/sessao", "abc")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"duracaoMinutos": 5}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.mensagem").value("parametro 'id' invalido"));
+    }
+
+    @Test
+    @DisplayName("POST /pautas/{id}/sessao com Content-Type nao suportado retorna 415 com ErroResponse")
+    void abrir_comContentTypeNaoSuportado_retorna415() throws Exception {
+        mockMvc.perform(post("/pautas/{id}/sessao", pautaId)
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("duracaoMinutos=5"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(415))
+                .andExpect(jsonPath("$.mensagem").value("content-type nao suportado"));
+    }
+
+    @Test
+    @DisplayName("GET /pautas/{id}/sessao (metodo nao suportado) retorna 405 com ErroResponse e header Allow")
+    void buscarSessao_metodoNaoSuportado_retorna405() throws Exception {
+        mockMvc.perform(get("/pautas/{id}/sessao", pautaId))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(405))
+                .andExpect(jsonPath("$.mensagem").value("metodo nao suportado"))
+                .andExpect(header().exists("Allow"));
+    }
+
+    @Test
+    @DisplayName("duracao no teto maximo (1440) retorna 2xx, teto + 1 retorna 400")
+    void abrir_comDuracaoNoTetoEAcimaDoTeto() throws Exception {
+        org.mockito.Mockito.when(clock.instant()).thenReturn(T0);
+
+        mockMvc.perform(post("/pautas/{id}/sessao", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"duracaoMinutos": 1440}
+                                """))
+                .andExpect(status().isCreated());
+
+        var outraPauta = pautaService.criar("Eleicao de diretoria " + System.nanoTime(), null);
+        mockMvc.perform(post("/pautas/{id}/sessao", outraPauta.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"duracaoMinutos": 1441}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
+    @DisplayName("duracao como string numerica (\"5\") retorna 400, nao coage para Integer")
+    void abrir_comDuracaoComoStringNumerica_retorna400() throws Exception {
+        mockMvc.perform(post("/pautas/{id}/sessao", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"duracaoMinutos": "5"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+    }
+
+    private record SessaoRequestComCampoExtra(Integer duracaoMinutos, String campoExtra) {
     }
 }

@@ -43,6 +43,33 @@ class SessaoTest {
     }
 
     @Test
+    @DisplayName("aceita duracao no teto maximo e rejeita teto + 1")
+    void validarDuracao_comDuracaoNoTetoERejeitandoAcimaDoTeto() {
+        Sessao.validarDuracao(Sessao.DURACAO_MAXIMA_MINUTOS);
+
+        assertThatThrownBy(() -> Sessao.validarDuracao(Sessao.DURACAO_MAXIMA_MINUTOS + 1))
+                .isInstanceOf(SessaoInvalidaException.class)
+                .hasMessage("duracao deve ser no maximo " + Sessao.DURACAO_MAXIMA_MINUTOS + " minutos");
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, -1, -100})
+    @DisplayName("construtor rejeita duracao invalida (nao so validarDuracao isolado)")
+    void construtor_comDuracaoInvalida_lancaExcecao(int duracaoInvalida) {
+        assertThatThrownBy(() -> new Sessao(pauta, duracaoInvalida, abertura))
+                .isInstanceOf(SessaoInvalidaException.class)
+                .hasMessage("duracao deve ser maior que zero");
+    }
+
+    @Test
+    @DisplayName("construtor rejeita abertura nula")
+    void construtor_comAberturaNula_lancaExcecao() {
+        assertThatThrownBy(() -> new Sessao(pauta, 5, null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("abertura e obrigatoria");
+    }
+
+    @Test
     @DisplayName("sessao esta aberta quando instante atual e anterior ao fim")
     void estaAberta_comInstanteAntesDoFim_retornaTrue() {
         var sessao = new Sessao(pauta, 10, abertura);
