@@ -210,4 +210,28 @@ class PautaControllerTest {
         mockMvc.perform(get("/pautas/{id}", "abc"))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    @DisplayName("Requisição com Accept não aceitável retorna 406 com corpo padronizado (não 500)")
+    void requisicaoComAcceptNaoAceitavel_retorna406ComCorpoPadronizado() throws Exception {
+        mockMvc.perform(get("/diagnostico").param("x", "y").accept(MediaType.APPLICATION_XML))
+                .andExpect(status().isNotAcceptable())
+                .andExpect(jsonPath("$.status").value(406))
+                .andExpect(jsonPath("$.error").value("Not Acceptable"))
+                .andExpect(jsonPath("$.path").value("/diagnostico"))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty())
+                .andExpect(jsonPath("$.message").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("Requisição sem parâmetro obrigatório retorna 400 com corpo padronizado (não 500)")
+    void requisicaoSemParametroObrigatorio_retorna400ComCorpoPadronizado() throws Exception {
+        mockMvc.perform(get("/diagnostico"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.path").value("/diagnostico"))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty())
+                .andExpect(jsonPath("$.message").isNotEmpty());
+    }
 }

@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -291,6 +292,25 @@ class SessaoControllerTest {
     }
 
     @Test
+    @DisplayName("Erro não tratado (RuntimeException) retorna 500 com corpo padronizado e sem texto da exceção")
+    void abrir_erroNaoTratado_retorna500ComCorpoPadronizadoSemTextoDaExcecao() throws Exception {
+        gancho.lancarErroNaProximaChamada();
+
+        mockMvc.perform(post("/pautas/{id}/sessao", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.error").value("Internal Server Error"))
+                .andExpect(jsonPath("$.message").value("erro interno inesperado"))
+                .andExpect(jsonPath("$.path").value("/pautas/" + pautaId + "/sessao"))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty())
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("RuntimeException"))));
+
+        assertThat(sessaoRepository.countByPautaId(pautaId)).isZero();
+    }
+
+    @Test
     @DisplayName("POST /pautas/{id}/sessao após fim da sessão anterior permite reabertura com 201")
     void abrir_sessaoAnteriorEncerrada_permiteReaberturaCom201() throws Exception {
         mockMvc.perform(post("/pautas/{id}/sessao", pautaId)
@@ -313,6 +333,10 @@ class SessaoControllerTest {
         try {
             Future<Integer> tarefa1 = executor.submit(() -> abrirChamando());
             gancho.aguardarPrimeiraChegada();
+
+            assertThat(gancho.nivelIsolamentoObservado())
+                    .as("isolamento efetivo da transação de SessaoService.abrir deve ser READ_COMMITTED")
+                    .isEqualTo(org.springframework.transaction.TransactionDefinition.ISOLATION_READ_COMMITTED);
 
             Future<Integer> tarefa2 = executor.submit(() -> abrirChamando());
 
