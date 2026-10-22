@@ -13,6 +13,9 @@ spring:
   h2:
     console:
       enabled: false
+  jackson:
+    deserialization:
+      accept-float-as-int: false
 ---
 spring:
   config:
