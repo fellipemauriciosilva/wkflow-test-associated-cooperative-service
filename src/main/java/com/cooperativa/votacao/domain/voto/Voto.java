@@ -55,7 +55,8 @@ public class Voto {
         if (associado == null || associado.isBlank()) {
             throw new VotoInvalidoException("associado e obrigatorio");
         }
-        if (associado.strip().length() > ASSOCIADO_TAMANHO_MAXIMO) {
+        var associadoStripado = associado.strip();
+        if (associadoStripado.codePointCount(0, associadoStripado.length()) > ASSOCIADO_TAMANHO_MAXIMO) {
             throw new VotoInvalidoException(
                     "associado deve ter no maximo " + ASSOCIADO_TAMANHO_MAXIMO + " caracteres");
         }

@@ -40,8 +40,10 @@ public class VotoService {
      * task.md desta fatia (ordem invertida em relacao a SessaoService: ali duracao/400 vem
      * antes da pauta/404). Constraint unica (associado, pauta_id) no banco e a defesa real
      * contra duplicata concorrente — o check em memoria aqui so evita a volta ao banco no
-     * caso comum sem concorrencia; a saveAndFlush implicita do IDENTITY ainda pode lancar
-     * DataIntegrityViolationException sob corrida, mapeada para o mesmo 409.
+     * caso comum sem concorrencia; com GenerationType.IDENTITY o INSERT ocorre no persist
+     * (nao no commit), entao a violacao de uk_voto_associado_pauta sob corrida ja aparece
+     * dentro deste metodo e e mapeada para o mesmo 409. saveAndFlush e so pra deixar isso
+     * explicito, nao e o que faz o INSERT disparar antes do commit.
      */
     @Transactional
     public Voto registrar(Long pautaId, String associado, TipoVoto tipoVoto) {
@@ -64,7 +66,11 @@ public class VotoService {
         try {
             return votoRepository.salvar(voto);
         } catch (DataIntegrityViolationException ex) {
-            throw new VotoDuplicadoException(pautaId, associado);
+            var causa = ex.getMostSpecificCause().getMessage();
+            if (causa != null && causa.toLowerCase().contains("uk_voto_associado_pauta")) {
+                throw new VotoDuplicadoException(pautaId, associado);
+            }
+            throw ex;
         }
     }
 

@@ -1,13 +1,17 @@
 package com.cooperativa.votacao.api.voto;
 
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.cooperativa.votacao.application.pauta.PautaService;
 import com.cooperativa.votacao.application.sessao.SessaoService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +39,9 @@ class VotoControllerTest {
     @Autowired
     private SessaoService sessaoService;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
     @MockBean
     private Clock clock;
 
@@ -57,14 +64,20 @@ class VotoControllerTest {
                         .content("""
                                 {"associado": "associado-A", "voto": "SIM"}
                                 """))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").isNumber())
+                .andExpect(jsonPath("$.pautaId").value(pautaId))
+                .andExpect(jsonPath("$.voto").value("SIM"));
 
         mockMvc.perform(post("/pautas/{id}/votos", pautaId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"associado": "associado-B", "voto": "NAO"}
                                 """))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").isNumber())
+                .andExpect(jsonPath("$.pautaId").value(pautaId))
+                .andExpect(jsonPath("$.voto").value("NAO"));
     }
 
     @Test
@@ -97,8 +110,14 @@ class VotoControllerTest {
     @Test
     @DisplayName("AC-3.4: voto apos fim da sessao retorna 409")
     void votar_aposFimDaSessao_retorna409() throws Exception {
-        when(clock.instant()).thenReturn(T0).thenReturn(T0.plusSeconds(90));
+        when(clock.instant()).thenReturn(T0);
         sessaoService.abrir(pautaId, 1);
+        // SessaoService.abrir chama clock.instant() exatamente 1 vez (abertura == agora);
+        // verify explicito evita que a sequencia de stub abaixo desloque silenciosamente
+        // se abrir() passar a chamar o clock mais de uma vez.
+        verify(clock, times(1)).instant();
+
+        when(clock.instant()).thenReturn(T0.plusSeconds(90));
 
         mockMvc.perform(post("/pautas/{id}/votos", pautaId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -223,5 +242,52 @@ class VotoControllerTest {
                                 """.formatted("a".repeat(51))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
+    @DisplayName("POST /pautas/abc/votos (id nao numerico) retorna 400")
+    void votar_comIdNaoNumerico_retorna400() throws Exception {
+        mockMvc.perform(post("/pautas/{id}/votos", "abc")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"associado": "associado-A", "voto": "SIM"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
+    @DisplayName("GET /pautas/abc/resultado (id nao numerico) retorna 400")
+    void resultado_comIdNaoNumerico_retorna400() throws Exception {
+        mockMvc.perform(get("/pautas/{id}/resultado", "abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
+    @DisplayName("POST /pautas/{id}/votos com Content-Type nao suportado retorna 415")
+    void votar_comContentTypeNaoSuportado_retorna415() throws Exception {
+        mockMvc.perform(post("/pautas/{id}/votos", pautaId)
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("associado=associado-A"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.status").value(415));
+    }
+
+    @Test
+    @DisplayName("POST /pautas/{id}/votos com body acima do limite retorna 413")
+    void votar_comBodyMuitoGrande_retorna413() throws Exception {
+        var payloadGigante = objectMapper.writeValueAsString(
+                new VotoRequestComCampoExtra("associado-A", "SIM", "a".repeat(20_000)));
+
+        mockMvc.perform(post("/pautas/{id}/votos", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payloadGigante))
+                .andExpect(status().isPayloadTooLarge())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(413));
+    }
+
+    private record VotoRequestComCampoExtra(String associado, String voto, String campoExtra) {
     }
 }
