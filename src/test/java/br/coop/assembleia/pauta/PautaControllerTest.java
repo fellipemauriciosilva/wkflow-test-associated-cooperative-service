@@ -3,10 +3,10 @@ package br.coop.assembleia.pauta;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -34,15 +35,17 @@ class PautaControllerTest {
 
     @Test
     void criaPautaComTituloValidoRetorna201ComId() throws Exception {
-        mockMvc.perform(post("/pautas")
+        MvcResult resultado = mockMvc.perform(post("/pautas")
                         .contentType("application/json")
                         .content("{\"titulo\":\"Aprovar balanco\",\"descricao\":\"Balanco 2025\"}"))
                 .andExpect(status().isCreated())
-                .andExpect(header().string("Location", org.hamcrest.Matchers.startsWith("/pautas/")))
                 .andExpect(jsonPath("$.id").isNumber())
                 .andExpect(jsonPath("$.titulo").value("Aprovar balanco"))
-                .andExpect(jsonPath("$.descricao").value("Balanco 2025"));
+                .andExpect(jsonPath("$.descricao").value("Balanco 2025"))
+                .andReturn();
 
+        Number id = JsonPath.read(resultado.getResponse().getContentAsString(), "$.id");
+        assertThat(resultado.getResponse().getHeader("Location")).isEqualTo("/pautas/" + id);
         assertThat(repository.count()).isEqualTo(1);
     }
 
@@ -78,6 +81,18 @@ class PautaControllerTest {
         mockMvc.perform(post("/pautas")
                         .contentType("application/json")
                         .content("{\"titulo\":\"" + titulo + "\"}"))
+                .andExpect(status().isBadRequest());
+
+        assertThat(repository.count()).isZero();
+    }
+
+    @Test
+    void rejeitaDescricaoAcimaDoLimiteSemPersistir() throws Exception {
+        String descricao = "d".repeat(Pauta.DESCRICAO_MAX + 1);
+
+        mockMvc.perform(post("/pautas")
+                        .contentType("application/json")
+                        .content("{\"titulo\":\"Aprovar balanco\",\"descricao\":\"" + descricao + "\"}"))
                 .andExpect(status().isBadRequest());
 
         assertThat(repository.count()).isZero();

@@ -23,7 +23,8 @@
 - 404 via `ResponseStatusException`.
 
 ## Entregas
-- Slice 1: criação e consulta de pauta, validação de `titulo`, testes MockMvc para 201, 400, 200 e 404.
+- Slice 1: criação e consulta de pauta, validação de `titulo` e `descricao` (limites 200/1000), testes MockMvc para 201, 400, 200 e 404.
+- Ciclo de correção do review: teste de `descricao` acima do limite; `Location` validado como `/pautas/{id}` exato.
 
 ## Armadilhas
 - Teste de tab em JSON: o caractere `\t` cru quebra o parse e gera 400 de sintaxe, não de validação. Usar `\\t` no literal Java.
