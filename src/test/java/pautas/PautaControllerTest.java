@@ -2,14 +2,17 @@ package pautas;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -17,6 +20,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.util.stream.Stream;
 
@@ -122,6 +126,51 @@ class PautaControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"titulo\": \"" + TITULO + "\", \"campoExtra\": 1}"))
                 .andExpect(status().isCreated());
+    }
+
+    @Test
+    void tituloNoLimiteDe200EAceito() throws Exception {
+        mvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json("a".repeat(200), null)))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void descricaoNoLimiteDe2000EAceita() throws Exception {
+        mvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(TITULO, "d".repeat(2000))))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void pautaDuplicadaEPermitida() throws Exception {
+        long primeira = cadastrar(TITULO, null);
+        long segunda = cadastrar(TITULO, null);
+        org.junit.jupiter.api.Assertions.assertNotEquals(primeira, segunda);
+    }
+
+    static Stream<Arguments> requisicoesFormaInvalida() {
+        return Stream.of(
+                Arguments.of(get("/pautas/abc"), 400, "Bad Request", "Parâmetro inválido: id"),
+                Arguments.of(post("/pautas").contentType(MediaType.TEXT_PLAIN).content("titulo"),
+                        415, "Unsupported Media Type", "Tipo de mídia não suportado"),
+                Arguments.of(put("/pautas"), 405, "Method Not Allowed", "Método não permitido"),
+                Arguments.of(delete("/pautas/1"), 405, "Method Not Allowed", "Método não permitido"));
+    }
+
+    @ParameterizedTest
+    @MethodSource("requisicoesFormaInvalida")
+    void requisicaoForaDoContratoRetornaErroPadronizado(
+            MockHttpServletRequestBuilder requisicao, int status, String error, String message) throws Exception {
+        mvc.perform(requisicao)
+                .andExpect(status().is(status))
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.status").value(status))
+                .andExpect(jsonPath("$.error").value(error))
+                .andExpect(jsonPath("$.message").value(message))
+                .andExpect(jsonPath("$.fieldErrors", hasSize(0)));
     }
 
     @Test

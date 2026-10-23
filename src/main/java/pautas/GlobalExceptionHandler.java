@@ -6,9 +6,12 @@ import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -24,6 +27,24 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErroResponse> corpoIlegivel(HttpMessageNotReadableException ex, HttpServletRequest request) {
         return resposta(HttpStatus.BAD_REQUEST, "Corpo da requisição inválido", request, List.of());
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErroResponse> parametroInvalido(
+            MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+        return resposta(HttpStatus.BAD_REQUEST, "Parâmetro inválido: " + ex.getName(), request, List.of());
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ErroResponse> tipoNaoSuportado(
+            HttpMediaTypeNotSupportedException ex, HttpServletRequest request) {
+        return resposta(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Tipo de mídia não suportado", request, List.of());
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErroResponse> metodoNaoPermitido(
+            HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {
+        return resposta(HttpStatus.METHOD_NOT_ALLOWED, "Método não permitido", request, List.of());
     }
 
     @ExceptionHandler(PautaNaoEncontradaException.class)
