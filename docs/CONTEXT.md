@@ -19,7 +19,7 @@
 
 ## Decisões
 - Título obrigatório via `@NotBlank` (rejeita nulo, vazio e só espaços) -> 400.
-- Descrição opcional, sem validação, persiste null.
+- Descrição opcional, sem validação, persiste null. Testes 201 sem descrição fazem GET e asserem `$.descricao` null.
 - Erro 400 no formato `ProblemDetail` (RFC 7807) via `spring.mvc.problemdetails.enabled=true`; campo `status` = 400.
 - `spring.jpa.open-in-view=false`.
 - Sem `Clock`: entidade não tem timestamp.
@@ -27,7 +27,8 @@
 ## Entregas
 - Projeto Maven criado do zero (repo antes só com `.gitignore`).
 - Endpoints `POST /pautas` e `GET /pautas/{id}`.
-- Suíte `PautaControllerTest` (8 testes): POST 201 com id, POST 201 sem descrição, POST 201 com descrição null, POST 400 para título null/vazio/espaços, GET 200 com dados, GET 404.
+- Suíte `PautaControllerTest` (8 testes): POST 201 com id, POST 201 sem descrição (persistência null verificada via GET), POST 201 com descrição null (persistência null verificada via GET), POST 400 para título null/vazio/espaços, GET 200 com dados, GET 404.
+- Review ciclo 1: correção de testes vácuos de descrição nula aplicada.
 
 ## Armadilhas
 - Teste e código dependem de H2 em memória; não há banco externo nem Docker.
@@ -40,3 +41,6 @@
 - Confirmar corpo do 201 `{"id": ...}` (assumido).
 - Confirmar prioridade (inferida média) e tipo do ticket (LATENCIA vs feature).
 - Requisito de latência não existe no corpo do ticket (Won't).
+- Confirmar com PO/arquitetura: autenticação (IDs sequenciais permitem enumerar GET /pautas/{id}).
+- Limite de tamanho de título/descrição: coluna varchar(255) estoura em 500 se passar; falta `@Size` (400) e teste.
+- Backlog de segurança/operação: perfil prod com datasource explícito (hoje H2 em memória), varredura de dependências (SCA), idempotência do POST, `trim` do título, teste de JSON malformado, isolamento de estado entre testes.
