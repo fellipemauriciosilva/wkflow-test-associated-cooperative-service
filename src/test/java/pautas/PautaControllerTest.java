@@ -174,6 +174,36 @@ class PautaControllerTest {
     }
 
     @Test
+    void tituloComTipoInvalidoRetornaFieldErrorNoCampoTitulo() throws Exception {
+        mvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"titulo\": [\"Aprovação\"]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Corpo da requisição inválido"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("titulo"))
+                .andExpect(jsonPath("$.fieldErrors[0].message").value("tipo inválido"));
+    }
+
+    @Test
+    void jsonMalformadoNoCadastroRetornaFieldErrorsVazio() throws Exception {
+        mvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"titulo\": "))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Corpo da requisição inválido"))
+                .andExpect(jsonPath("$.fieldErrors", hasSize(0)));
+    }
+
+    @Test
+    void corpoEmArrayNoCadastroNaoGeraCampoNulo() throws Exception {
+        mvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("[1]"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors", hasSize(0)));
+    }
+
+    @Test
     void idEnviadoNoPostNaoEhAceitoComoIdentificador() throws Exception {
         MvcResult resultado = mvc.perform(post("/pautas")
                         .contentType(MediaType.APPLICATION_JSON)
