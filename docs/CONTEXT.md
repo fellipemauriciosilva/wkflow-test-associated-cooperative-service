@@ -39,6 +39,9 @@
 - Mensagem de validação de `titulo` ausente/vazio/só espaços: `titulo: obrigatório e não pode ser vazio`, definida em `@NotBlank(message)`.
 - Enumeração de pautas por ID sequencial (`IDENTITY`) sem autenticação: risco aceito, pois autenticação está fora do escopo.
 - Espaços nas bordas do título/descrição são persistidos como enviados (sem `strip()`). Decisão pendente.
+- Prioridade: N/A (ticket não define; não bloqueia implementação). Assumido.
+- Limite do corpo da requisição: `LimiteTamanhoCorpoFilter` rejeita `Content-Length` acima de 16 KiB com 413 e corpo JSON `{status, erro, detalhes}`. Antes de Jackson parsear. Assumido, aguarda PO.
+- Requisição sem `Content-Length` (chunked) não é limitada pelo filtro. Risco de DoS residual aceito até PO confirmar; mitigação real em produção: limite no proxy reverso (ex.: `client_max_body_size`).
 
 ## Entregas
 
@@ -46,7 +49,17 @@
 - Consulta de pauta (`GET /pautas/{id}`, 200 ou 404).
 - Validação de título (400 para ausente, vazio ou só espaços).
 - Limites de tamanho: título 255 e descrição 2000, com testes nos dois lados do limite (aceita no limite, 400 acima).
-- Testes MockMvc: 16 casos. Cobrem AC-1.1 a AC-1.4, AC-2.1, AC-2.2, header Location, JSON malformado (400), `GET /pautas/abc` (400), limites de título e descrição. Asserção de `detalhes` embutida nos casos de validação. Suite verde.
+- Limite de corpo: filtro 413 com teste (`postComCorpoAcimaDoLimiteRetorna413ComCorpoJson`).
+- Testes MockMvc: 17 casos. Suite verde (`mvnd test`).
+- Mapeamento spec → testes:
+  - AC-1.1 (201 + id): `postComTituloValidoRetorna201ComId`.
+  - AC-1.2 (sem título → 400): `postSemTituloRetorna400`.
+  - AC-1.3 (vazio/espaços → 400): `postComTituloVazioRetorna400`, `postComTituloSoEspacosRetorna400`.
+  - AC-1.4 (com/sem descrição → aceito): `postComDescricaoAceitaRetorna201`, `postSemDescricaoAceitaRetorna201`.
+  - AC-2.1 (GET 200 com campos): `getPautaExistenteRetorna200ComCampos`.
+  - AC-2.2 (GET inexistente → 404): `getPautaInexistenteRetorna404ComCorpoJson`.
+  - C1 (Location): `postRetornaHeaderLocationComIdCriado`.
+  - Extras: limites de título/descrição, JSON malformado, `GET /pautas/abc`, corpo acima do limite.
 
 ## Armadilhas
 
@@ -60,6 +73,6 @@
   - status de validação (400 assumido);
   - corpo do POST (`{"id"}` assumido);
   - limites de tamanho de título (255) e descrição (2000), assumidos;
-  - requisito de latência (nenhum assumido);
-  - prioridade.
+  - limite de corpo (16 KiB), assumido;
+  - requisito de latência (nenhum assumido).
 - Se o PO mudar o contrato, ajustar `ApiExceptionHandler`, `PautaController` e os testes correspondentes.

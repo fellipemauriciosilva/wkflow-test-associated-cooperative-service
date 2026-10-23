@@ -136,6 +136,19 @@ class PautaControllerTest {
     }
 
     @Test
+    void postComCorpoAcimaDoLimiteRetorna413ComCorpoJson() throws Exception {
+        String descricao = "d".repeat(20000);
+        String corpo = "{\"titulo\": \"Pauta\", \"descricao\": \"" + descricao + "\"}";
+        mvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Content-Length", corpo.length())
+                        .content(corpo))
+                .andExpect(status().isPayloadTooLarge())
+                .andExpect(jsonPath("$.status").value(413))
+                .andExpect(jsonPath("$.erro").value("Requisição muito grande"));
+    }
+
+    @Test
     void postComDescricaoAceitaRetorna201() throws Exception {
         mvc.perform(post("/pautas")
                         .contentType(MediaType.APPLICATION_JSON)
