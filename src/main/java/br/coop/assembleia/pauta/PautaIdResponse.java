@@ -1,4 +1,6 @@
 package br.coop.assembleia.pauta;
 
-public record PautaIdResponse(Long id) {
+import java.util.UUID;
+
+public record PautaIdResponse(UUID id) {
 }

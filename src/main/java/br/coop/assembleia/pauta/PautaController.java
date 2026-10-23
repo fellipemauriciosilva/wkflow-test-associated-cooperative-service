@@ -1,6 +1,7 @@
 package br.coop.assembleia.pauta;
 
 import jakarta.validation.Valid;
+import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,7 +29,7 @@ public class PautaController {
     }
 
     @GetMapping("/{id}")
-    public PautaResponse buscar(@PathVariable Long id) {
+    public PautaResponse buscar(@PathVariable UUID id) {
         return repository.findById(id)
                 .map(PautaResponse::from)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));

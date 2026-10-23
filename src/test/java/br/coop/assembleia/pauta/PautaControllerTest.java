@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -44,14 +45,14 @@ class PautaControllerTest {
     void criaPautaComTituloValidoRetorna201ComId() throws Exception {
         postPauta(Map.of("titulo", "Aprovar balanço", "descricao", "Balanço 2025"))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").isNumber());
+                .andExpect(jsonPath("$.id").isString());
     }
 
     @Test
     void semDescricaoEAceitaComStatus201() throws Exception {
         postPauta(Map.of("titulo", "Eleição do conselho"))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").isNumber());
+                .andExpect(jsonPath("$.id").isString());
     }
 
     @Test
@@ -118,18 +119,18 @@ class PautaControllerTest {
         String corpo = postPauta(Map.of("titulo", "Aprovar estatuto", "descricao", "Revisao do art. 10"))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        long id = objectMapper.readTree(corpo).get("id").asLong();
+        UUID id = UUID.fromString(objectMapper.readTree(corpo).get("id").asText());
 
         mvc.perform(get("/pautas/{id}", id))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(id))
+                .andExpect(jsonPath("$.id").value(id.toString()))
                 .andExpect(jsonPath("$.titulo").value("Aprovar estatuto"))
                 .andExpect(jsonPath("$.descricao").value("Revisao do art. 10"));
     }
 
     @Test
     void buscaPautaInexistenteRetorna404() throws Exception {
-        mvc.perform(get("/pautas/{id}", 999_999L))
+        mvc.perform(get("/pautas/{id}", UUID.randomUUID()))
                 .andExpect(status().isNotFound());
     }
 
@@ -138,7 +139,7 @@ class PautaControllerTest {
         String corpo = postPauta(Map.of("titulo", "Pauta temporaria"))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        long id = objectMapper.readTree(corpo).get("id").asLong();
+        UUID id = UUID.fromString(objectMapper.readTree(corpo).get("id").asText());
         repository.deleteById(id);
 
         mvc.perform(get("/pautas/{id}", id))
