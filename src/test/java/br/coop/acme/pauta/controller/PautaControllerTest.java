@@ -11,6 +11,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -34,18 +35,32 @@ class PautaControllerTest {
 
     @Test
     void postSemDescricaoRetorna201() throws Exception {
-        mvc.perform(post("/pautas")
+        String corpoCriado = mvc.perform(post("/pautas")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"titulo\":\"Sem descricao\"}"))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long id = JsonPath.parse(corpoCriado).read("$.id", Long.class);
+
+        mvc.perform(get("/pautas/" + id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.titulo").value("Sem descricao"))
+                .andExpect(jsonPath("$.descricao").value(nullValue()));
     }
 
     @Test
     void postComDescricaoNulaRetorna201() throws Exception {
-        mvc.perform(post("/pautas")
+        String corpoCriado = mvc.perform(post("/pautas")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"titulo\":\"Descricao nula\",\"descricao\":null}"))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long id = JsonPath.parse(corpoCriado).read("$.id", Long.class);
+
+        mvc.perform(get("/pautas/" + id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.titulo").value("Descricao nula"))
+                .andExpect(jsonPath("$.descricao").value(nullValue()));
     }
 
     @ParameterizedTest
