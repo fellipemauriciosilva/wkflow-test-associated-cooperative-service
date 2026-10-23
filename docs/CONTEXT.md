@@ -32,13 +32,18 @@
 - Corpo do POST: `{"id": <Long>}` com 201 e header `Location: /pautas/{id}` (assumido, aguarda PO).
 - Sem requisito de latência (W1).
 - Escopo restrito a POST e GET; nada de alterar, excluir, listar, votação, autenticação.
+- Erros fora do contrato `{status, erro, detalhes}`: 415, 405 e 404 de rota desconhecida caem no corpo padrão do Spring. Decisão: manter, sem handler genérico, até PO pedir (contrato cobre só validação, JSON malformado e 404 de pauta).
+- Erro 500 cai no corpo padrão do Spring. Mesma decisão.
+- Limite de tamanho de body e título: sem limite definido, risco de DoS aceito como pendente até PO definir. Não há `@Size` nem limite no servidor; `@Lob` aceita CLOB sem teto.
+- Enumeração de pautas por ID sequencial (`IDENTITY`) sem autenticação: risco aceito, pois autenticação está fora do escopo.
+- Espaços nas bordas do título/descrição são persistidos como enviados (sem `strip()`). Decisão pendente.
 
 ## Entregas
 
 - Cadastro de pauta (`POST /pautas`, 201 + id + Location).
 - Consulta de pauta (`GET /pautas/{id}`, 200 ou 404).
 - Validação de título (400 para ausente, vazio ou só espaços).
-- Testes MockMvc: 10 casos cobrindo AC-1.1 a AC-1.4, AC-2.1, AC-2.2 e header Location. Suite verde.
+- Testes MockMvc: 12 casos cobrindo AC-1.1 a AC-1.4, AC-2.1, AC-2.2, header Location, `detalhes` na validação, JSON malformado (400) e `GET /pautas/abc` (400). Suite verde.
 
 ## Armadilhas
 

@@ -57,7 +57,26 @@ class PautaControllerTest {
                         .content("{}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.erro").value(notNullValue()));
+                .andExpect(jsonPath("$.erro").value(notNullValue()))
+                .andExpect(jsonPath("$.detalhes[0]").value("titulo: obrigatório e não pode ser vazio"));
+    }
+
+    @Test
+    void postJsonMalformadoRetorna400ComCorpoJson() throws Exception {
+        mvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{titulo: "))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.erro").value("Requisição malformada"));
+    }
+
+    @Test
+    void getIdNaoNumericoRetorna400ComCorpoJson() throws Exception {
+        mvc.perform(get("/pautas/{id}", "abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.erro").value("Requisição malformada"));
     }
 
     @Test
