@@ -28,13 +28,15 @@
 ## Decisões
 
 - Título obrigatório: `@NotBlank` → 400 (assumido, aguarda PO).
-- Descrição opcional, sem limite de tamanho (não informado).
+- Descrição opcional, máximo 2000 caracteres: `@Size(max = 2000)` no DTO (assumido, aguarda PO).
 - Corpo do POST: `{"id": <Long>}` com 201 e header `Location: /pautas/{id}` (assumido, aguarda PO).
 - Sem requisito de latência (W1).
 - Escopo restrito a POST e GET; nada de alterar, excluir, listar, votação, autenticação.
 - Erros fora do contrato `{status, erro, detalhes}`: 415, 405 e 404 de rota desconhecida caem no corpo padrão do Spring. Decisão: manter, sem handler genérico, até PO pedir (contrato cobre só validação, JSON malformado e 404 de pauta).
 - Erro 500 cai no corpo padrão do Spring. Mesma decisão.
-- Limite de tamanho de body e título: sem limite definido, risco de DoS aceito como pendente até PO definir. Não há `@Size` nem limite no servidor; `@Lob` aceita CLOB sem teto.
+- Limite de título: máximo 255 caracteres, `@Size(max = 255)` no DTO (assumido, aguarda PO). Mensagem de validação vem do campo: `titulo: máximo de 255 caracteres`.
+- Limite de descrição: máximo 2000 caracteres, `@Size(max = 2000)` no DTO (assumido, aguarda PO). Mensagem: `descricao: máximo de 2000 caracteres`.
+- Mensagem de validação de `titulo` ausente/vazio/só espaços: `titulo: obrigatório e não pode ser vazio`, definida em `@NotBlank(message)`.
 - Enumeração de pautas por ID sequencial (`IDENTITY`) sem autenticação: risco aceito, pois autenticação está fora do escopo.
 - Espaços nas bordas do título/descrição são persistidos como enviados (sem `strip()`). Decisão pendente.
 
@@ -43,11 +45,12 @@
 - Cadastro de pauta (`POST /pautas`, 201 + id + Location).
 - Consulta de pauta (`GET /pautas/{id}`, 200 ou 404).
 - Validação de título (400 para ausente, vazio ou só espaços).
-- Testes MockMvc: 12 casos cobrindo AC-1.1 a AC-1.4, AC-2.1, AC-2.2, header Location, `detalhes` na validação, JSON malformado (400) e `GET /pautas/abc` (400). Suite verde.
+- Limites de tamanho: título 255 e descrição 2000, com testes nos dois lados do limite (aceita no limite, 400 acima).
+- Testes MockMvc: 16 casos. Cobrem AC-1.1 a AC-1.4, AC-2.1, AC-2.2, header Location, JSON malformado (400), `GET /pautas/abc` (400), limites de título e descrição. Asserção de `detalhes` embutida nos casos de validação. Suite verde.
 
 ## Armadilhas
 
-- `@Lob` em `titulo` e `descricao` no H2: aceito sem limite de tamanho, conforme decisão atual. Revisar se o PO definir limite.
+- `@Lob` em `titulo` e `descricao` no H2: o teto vem só do `@Size` do DTO. Se o PO mudar os limites, ajustar `CriarPautaRequest` e os testes de limite.
 - `curl` e `wget` não existem na imagem; não usar para testar o proxy Maven.
 - Saída do `mvnd` no terminal sai truncada/embaralhada (jline sem native lib); conferir resultado em `target/surefire-reports`.
 
@@ -56,7 +59,7 @@
 - Gate da spec: implementação bloqueada até PO confirmar:
   - status de validação (400 assumido);
   - corpo do POST (`{"id"}` assumido);
-  - limite de tamanho de título/descrição;
+  - limites de tamanho de título (255) e descrição (2000), assumidos;
   - requisito de latência (nenhum assumido);
   - prioridade.
 - Se o PO mudar o contrato, ajustar `ApiExceptionHandler`, `PautaController` e os testes correspondentes.

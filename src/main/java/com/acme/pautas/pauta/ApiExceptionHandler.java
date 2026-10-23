@@ -19,8 +19,7 @@ public class ApiExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ErroResponse> validacao(MethodArgumentNotValidException ex) {
         List<String> detalhes = ex.getBindingResult().getFieldErrors().stream()
-                .map(FieldError::getField)
-                .map(campo -> campo + ": obrigatório e não pode ser vazio")
+                .map(erro -> erro.getField() + ": " + erro.getDefaultMessage())
                 .toList();
         return erro(HttpStatus.BAD_REQUEST, "Requisição inválida", detalhes);
     }

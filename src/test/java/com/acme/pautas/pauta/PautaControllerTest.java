@@ -98,6 +98,44 @@ class PautaControllerTest {
     }
 
     @Test
+    void postComTituloAcimaDoLimiteRetorna400() throws Exception {
+        String titulo = "a".repeat(256);
+        mvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"titulo\": \"" + titulo + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detalhes[0]").value("titulo: máximo de 255 caracteres"));
+    }
+
+    @Test
+    void postComTituloNoLimiteRetorna201() throws Exception {
+        String titulo = "a".repeat(255);
+        mvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"titulo\": \"" + titulo + "\"}"))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void postComDescricaoAcimaDoLimiteRetorna400() throws Exception {
+        String descricao = "d".repeat(2001);
+        mvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"titulo\": \"Pauta\", \"descricao\": \"" + descricao + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detalhes[0]").value("descricao: máximo de 2000 caracteres"));
+    }
+
+    @Test
+    void postComDescricaoNoLimiteRetorna201() throws Exception {
+        String descricao = "d".repeat(2000);
+        mvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"titulo\": \"Pauta\", \"descricao\": \"" + descricao + "\"}"))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
     void postComDescricaoAceitaRetorna201() throws Exception {
         mvc.perform(post("/pautas")
                         .contentType(MediaType.APPLICATION_JSON)
