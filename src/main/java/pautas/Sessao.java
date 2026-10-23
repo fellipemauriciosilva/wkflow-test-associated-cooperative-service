@@ -9,11 +9,14 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 
 @Entity
-@Table(name = "sessao")
+@Table(name = "sessao", uniqueConstraints = @UniqueConstraint(name = Sessao.UK_PAUTA, columnNames = "pauta_id"))
 public class Sessao {
+
+    static final String UK_PAUTA = "uk_sessao_pauta";
 
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "sessao_seq")
@@ -21,7 +24,7 @@ public class Sessao {
     private Long id;
 
     @ManyToOne(optional = false)
-    @JoinColumn(name = "pauta_id", nullable = false, unique = true)
+    @JoinColumn(name = "pauta_id", nullable = false)
     private Pauta pauta;
 
     @Column(name = "abertura", nullable = false)

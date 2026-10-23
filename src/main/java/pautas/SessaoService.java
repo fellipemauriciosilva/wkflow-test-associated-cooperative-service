@@ -3,6 +3,8 @@ package pautas;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Locale;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,7 +37,20 @@ public class SessaoService {
         try {
             return SessaoResponse.de(sessaoRepository.saveAndFlush(sessao));
         } catch (DataIntegrityViolationException e) {
+            if (!violaUnicidadeDaPauta(e)) {
+                throw e;
+            }
             throw new SessaoJaExisteException(pautaId);
         }
+    }
+
+    private static boolean violaUnicidadeDaPauta(DataIntegrityViolationException e) {
+        for (Throwable causa = e; causa != null; causa = causa.getCause()) {
+            if (causa instanceof ConstraintViolationException cve) {
+                String nome = cve.getConstraintName();
+                return nome != null && nome.toLowerCase(Locale.ROOT).contains(Sessao.UK_PAUTA);
+            }
+        }
+        return false;
     }
 }

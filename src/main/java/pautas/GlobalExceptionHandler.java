@@ -1,11 +1,11 @@
 package pautas;
 
+import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -27,11 +27,17 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErroResponse> corpoIlegivel(HttpMessageNotReadableException ex, HttpServletRequest request) {
-        List<ErroResponse.CampoErro> campos = ex.getCause() instanceof InvalidFormatException ife
-                && !ife.getPath().isEmpty()
-                ? List.of(new ErroResponse.CampoErro(ife.getPath().get(0).getFieldName(), "tipo inválido"))
-                : List.of();
-        return resposta(HttpStatus.BAD_REQUEST, "Corpo da requisição inválido", request, campos);
+        return resposta(HttpStatus.BAD_REQUEST, "Corpo da requisição inválido", request, campoComTipoInvalido(ex));
+    }
+
+    private static List<ErroResponse.CampoErro> campoComTipoInvalido(HttpMessageNotReadableException ex) {
+        if (ex.getCause() instanceof MismatchedInputException mie && !mie.getPath().isEmpty()) {
+            String campo = mie.getPath().get(0).getFieldName();
+            if (campo != null) {
+                return List.of(new ErroResponse.CampoErro(campo, "tipo inválido"));
+            }
+        }
+        return List.of();
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
