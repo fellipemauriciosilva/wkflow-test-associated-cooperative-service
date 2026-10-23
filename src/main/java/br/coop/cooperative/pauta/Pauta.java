@@ -13,9 +13,10 @@ public class Pauta {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 200)
     private String titulo;
 
+    @Column(length = 1000)
     private String descricao;
 
     protected Pauta() {

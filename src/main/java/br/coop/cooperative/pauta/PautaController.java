@@ -2,6 +2,7 @@ package br.coop.cooperative.pauta;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -36,7 +37,9 @@ public class PautaController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pauta não encontrada"));
     }
 
-    public record CriarPautaRequest(@NotBlank String titulo, String descricao) {
+    public record CriarPautaRequest(
+            @NotBlank @Size(max = 200) String titulo,
+            @Size(max = 1000) String descricao) {
     }
 
     public record PautaResponse(Long id, String titulo, String descricao) {
