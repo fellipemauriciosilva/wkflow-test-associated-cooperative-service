@@ -7,7 +7,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -93,12 +92,23 @@ class PautaControllerTest {
     }
 
     @Test
-    void descricaoComDuzentosCinquentaESeisCaracteresRetorna400SemPersistir() throws Exception {
-        Map<String, String> corpo = new HashMap<>();
-        corpo.put("titulo", "Aprovar estatuto");
-        corpo.put("descricao", "d".repeat(256));
+    void descricaoComDuzentosCinquentaECincoCaracteresEAceita() throws Exception {
+        postPauta(Map.of("titulo", "Aprovar estatuto", "descricao", "d".repeat(255)))
+                .andExpect(status().isCreated());
+    }
 
-        postPauta(corpo).andExpect(status().isBadRequest());
+    @Test
+    void descricaoComDuzentosCinquentaESeisCaracteresRetorna400SemPersistir() throws Exception {
+        postPauta(Map.of("titulo", "Aprovar estatuto", "descricao", "d".repeat(256)))
+                .andExpect(status().isBadRequest());
+
+        assertThat(repository.count()).isZero();
+    }
+
+    @Test
+    void corpoAcimaDoLimiteRetorna413SemPersistir() throws Exception {
+        postPauta(Map.of("titulo", "a".repeat(9000)))
+                .andExpect(status().isPayloadTooLarge());
 
         assertThat(repository.count()).isZero();
     }
@@ -115,6 +125,12 @@ class PautaControllerTest {
                 .andExpect(jsonPath("$.id").value(id))
                 .andExpect(jsonPath("$.titulo").value("Aprovar estatuto"))
                 .andExpect(jsonPath("$.descricao").value("Revisao do art. 10"));
+    }
+
+    @Test
+    void buscaPautaInexistenteRetorna404() throws Exception {
+        mvc.perform(get("/pautas/{id}", 999_999L))
+                .andExpect(status().isNotFound());
     }
 
     @Test
