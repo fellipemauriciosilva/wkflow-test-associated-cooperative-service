@@ -1,13 +1,16 @@
 package com.acme.pautas.api;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -26,24 +29,64 @@ class PautaControllerTest {
 
     @Test
     void criaPautaComTituloEDescricaoRetorna201ComIdELocation() throws Exception {
-        mvc.perform(post("/pautas")
+        MvcResult criada = mvc.perform(post("/pautas")
                         .contentType("application/json")
                         .content("{\"titulo\":\"Aprovar balanço\",\"descricao\":\"Balanço 2025\"}"))
                 .andExpect(status().isCreated())
-                .andExpect(header().string("Location", containsString("/pautas/")))
                 .andExpect(jsonPath("$.id", notNullValue()))
                 .andExpect(jsonPath("$.titulo").value("Aprovar balanço"))
-                .andExpect(jsonPath("$.descricao").value("Balanço 2025"));
+                .andExpect(jsonPath("$.descricao").value("Balanço 2025"))
+                .andReturn();
+        String id = JsonPath.read(criada.getResponse().getContentAsString(), "$.id").toString();
+
+        assertThat(criada.getResponse().getHeader("Location")).endsWith("/pautas/" + id);
     }
 
     @Test
-    void criaPautaSemDescricaoRetorna201() throws Exception {
+    void criaPautaSemDescricaoRetorna201SemChaveDescricao() throws Exception {
         mvc.perform(post("/pautas")
                         .contentType("application/json")
                         .content("{\"titulo\":\"Só título\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id", notNullValue()))
-                .andExpect(jsonPath("$.descricao").doesNotExist());
+                .andExpect(content().string(not(containsString("\"descricao\""))));
+    }
+
+    @Test
+    void criaPautaComTituloNoLimiteRetorna201() throws Exception {
+        mvc.perform(post("/pautas")
+                        .contentType("application/json")
+                        .content(corpo("a".repeat(255), "b".repeat(2000))))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void criaPautaComTituloAcimaDoLimiteRetorna400() throws Exception {
+        mvc.perform(post("/pautas")
+                        .contentType("application/json")
+                        .content(corpo("a".repeat(256), null)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void criaPautaComDescricaoNoLimiteRetorna201() throws Exception {
+        mvc.perform(post("/pautas")
+                        .contentType("application/json")
+                        .content(corpo("Título", "b".repeat(2000))))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void criaPautaComDescricaoAcimaDoLimiteRetorna400() throws Exception {
+        mvc.perform(post("/pautas")
+                        .contentType("application/json")
+                        .content(corpo("Título", "b".repeat(2001))))
+                .andExpect(status().isBadRequest());
+    }
+
+    private static String corpo(String titulo, String descricao) {
+        String desc = descricao == null ? "" : ",\"descricao\":\"" + descricao + "\"";
+        return "{\"titulo\":\"" + titulo + "\"" + desc + "}";
     }
 
     @Test
