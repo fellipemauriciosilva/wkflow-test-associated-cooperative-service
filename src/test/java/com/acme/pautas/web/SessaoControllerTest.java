@@ -5,6 +5,8 @@ import com.acme.pautas.repository.SessaoRepository;
 import com.acme.pautas.service.PautaService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -64,6 +66,44 @@ class SessaoControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.abertura").value("2026-10-24T12:00:00Z"))
                 .andExpect(jsonPath("$.fim").value("2026-10-24T12:01:00Z"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{}", "{\"duracaoMinutos\": null}", ""})
+    void corpoSemDuracaoUsaPadraoDeUmMinuto(String corpo) throws Exception {
+        Long pautaId = pautas.cadastrar("Pauta corpo sem duração " + corpo.length(), null).getId();
+
+        mvc.perform(post("/pautas/{id}/sessao", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(corpo))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.abertura").value("2026-10-24T12:00:00Z"))
+                .andExpect(jsonPath("$.fim").value("2026-10-24T12:01:00Z"));
+    }
+
+    @Test
+    void duracaoNoLimiteDe1440MinutosRetorna201() throws Exception {
+        Long pautaId = pautas.cadastrar("Pauta duração máxima", null).getId();
+
+        mvc.perform(post("/pautas/{id}/sessao", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"duracaoMinutos\": 1440}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.fim").value("2026-10-25T12:00:00Z"));
+    }
+
+    @Test
+    void duracaoAcimaDe1440MinutosRetorna400enaoGravaSessao() throws Exception {
+        Long pautaId = pautas.cadastrar("Pauta duração acima do máximo", null).getId();
+
+        mvc.perform(post("/pautas/{id}/sessao", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"duracaoMinutos\": 1441}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.erro").value("VALIDACAO_INVALIDA"));
+
+        assertEquals(0, sessoes.countByPautaId(pautaId));
     }
 
     @Test
