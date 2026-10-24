@@ -150,36 +150,45 @@ class PautaControllerTest {
 
     @Test
     void metodoNaoPermitidoRetorna405NoFormatoPadrao() throws Exception {
-        mvc.perform(put("/pautas")
+        MvcResult resultado = mvc.perform(put("/pautas")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"titulo\": \"x\"}"))
                 .andExpect(status().isMethodNotAllowed())
                 .andExpect(jsonPath("$.status").value(405))
                 .andExpect(jsonPath("$.erro").value("VALIDACAO_INVALIDA"))
-                .andExpect(jsonPath("$.path").value("/pautas"));
+                .andExpect(jsonPath("$.mensagem").isNotEmpty())
+                .andExpect(jsonPath("$.path").value("/pautas"))
+                .andReturn();
+        assertEquals(CHAVES_ERRO, chaves(resultado.getResponse().getContentAsString()));
     }
 
     @Test
     void tipoDeMidiaNaoSuportadoRetorna415NoFormatoPadrao() throws Exception {
-        mvc.perform(post("/pautas")
+        MvcResult resultado = mvc.perform(post("/pautas")
                         .contentType(MediaType.TEXT_PLAIN)
                         .content("titulo=x"))
                 .andExpect(status().isUnsupportedMediaType())
                 .andExpect(jsonPath("$.status").value(415))
                 .andExpect(jsonPath("$.erro").value("VALIDACAO_INVALIDA"))
-                .andExpect(jsonPath("$.path").value("/pautas"));
+                .andExpect(jsonPath("$.mensagem").isNotEmpty())
+                .andExpect(jsonPath("$.path").value("/pautas"))
+                .andReturn();
+        assertEquals(CHAVES_ERRO, chaves(resultado.getResponse().getContentAsString()));
     }
 
     @Test
     void midiaNaoAceitaRetorna406NoFormatoPadrao() throws Exception {
-        mvc.perform(post("/pautas")
+        MvcResult resultado = mvc.perform(post("/pautas")
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_XML)
                         .content("{\"titulo\": \"Aceite xml\"}"))
                 .andExpect(status().isNotAcceptable())
                 .andExpect(jsonPath("$.status").value(406))
                 .andExpect(jsonPath("$.erro").value("VALIDACAO_INVALIDA"))
-                .andExpect(jsonPath("$.path").value("/pautas"));
+                .andExpect(jsonPath("$.mensagem").isNotEmpty())
+                .andExpect(jsonPath("$.path").value("/pautas"))
+                .andReturn();
+        assertEquals(CHAVES_ERRO, chaves(resultado.getResponse().getContentAsString()));
     }
 
     @Test
