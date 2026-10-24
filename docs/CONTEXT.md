@@ -9,14 +9,15 @@
 - `src/main/java/com/acme/pautas/service`: `PautaService` (cadastrar, buscar) e `PautaNaoEncontradaException`.
 - `src/main/java/com/acme/pautas/web`: `PautaController`, `PautaRequest` (`@NotBlank` e `@Size` em `titulo`, `@Size` em `descricao`), `PautaResponse`, `ErroResponse`, `GlobalExceptionHandler` (`@RestControllerAdvice`), `LimiteTamanhoCorpoFilter` (corta body acima de 64 KB com 413).
 - `src/main/resources`: `application.yml` (ddl `none`) e `schema.sql` (tabela `pauta`).
-- `src/test`: `PautaControllerTest` (MockMvc, AC-1.1 a AC-1.4 e AC-1.6), `GlobalExceptionHandlerTest` (500 sem vazar mensagem), `PautasApplicationTests` (contexto e tabela `PAUTA`, AC-1.5).
+- `src/test`: `PautaControllerTest` (MockMvc, AC-1.1 a AC-1.4 e AC-1.6, 405/415/406), `GlobalExceptionHandlerTest` (500 direto no handler e 500 via rota com controller stub), `PautasApplicationTests` (contexto e tabela `PAUTA`, AC-1.5).
+- `docs/TASK-fatia-1.md`: cópia do task.md da fatia 1 (requisitos, ACs, premissas).
 
 ## Stack e comandos
 
 - Java 21, Spring Boot 3.3.13, Maven, H2 em memória, JUnit 5, MockMvc.
 - Pacote base: `com.acme.pautas`. Artefato: `pautas`.
 - Testes: `mvnd test` (sem `clean`). Rodar um teste: `mvnd test -Dtest='Classe#metodo'`.
-- Verificação de CVE: plugin `dependency-check-maven` 12.2.2 declarado no `pom.xml`, sem fase vinculada. Rodar com `mvnd org.owasp:dependency-check-maven:check`.
+- Verificação de CVE: plugin `dependency-check-maven` 12.2.2 vinculado ao goal `check` na fase `verify` (`pom.xml`). Roda em `mvn verify`, não em `mvnd test`. Rodar isolado: `mvnd org.owasp:dependency-check-maven:check`.
 - Dependências vêm do mirror interno (`ORQALIZ_ARTIFACT_PROXY_MAVEN_URL`). Sem `curl` nem `python3` no ambiente; para consultar o mirror use programa Java.
 - Subir: `mvnd spring-boot:run`.
 
@@ -45,6 +46,7 @@
 - Ciclo de correção do review: README ajustado para estado planejado e `docs/SPEC.md` criado com modelo de ameaças e critérios de aceite.
 - Fatia 1 (épico `run_94bb0d49e2da`): módulo Maven Spring Boot 3 / Java 21 / H2, `POST /pautas`, `GET /pautas/{id}`, handler global de erros.
 - `c1d43ff` correções do review: JSON malformado, 405/415/406/413/500 no formato padrão, `@Size`, limite de body, schema fora do Hibernate, H2 com nome único por contexto, Boot 3.3.13. 17 testes verdes.
+- Ciclo 2 do review: 405/415/406 com chaves exatas e `mensagem`; 500 via rota MockMvc com controller stub; `dependency-check` vinculado a `verify` (execução bloqueada por falta de internet); `docs/SPEC.md` com AC-1.x mapeados a testes; `docs/TASK-fatia-1.md`. 18 testes verdes.
 
 ## Armadilhas
 
@@ -55,7 +57,8 @@
 - Cada contexto Spring usa H2 próprio (`pautas-${random.uuid}`). Não voltar a nome fixo, senão contextos se atrapalham.
 - `schema.sql` roda em qualquer perfil. Ao criar perfil de produção, revisar isso.
 - Limite de body é filtro de servidor, não do proxy. Documentado aqui; proxy externo pode ter limite próprio.
-- Dependency-check não roda no `mvnd test`. Versão 12.2.2 não verificada no mirror.
+- Dependency-check não roda no `mvnd test`. Em `mvn verify` ele baixa o banco KEV da CISA (`www.cisa.gov`) e falha sem internet (`UnknownHostException`). Plugin 12.2.2 resolve no mirror, mas não há CVE report neste ambiente. Rodar com acesso à internet ou com banco NVD/KEV local.
+- Controller stub de teste de 500 fica em `GlobalExceptionHandlerTest`. Não mover para outra classe sem revisar o `standaloneSetup`.
 
 ## Pendências
 
@@ -64,5 +67,8 @@
 - Confirmar formato de erro para o épico inteiro.
 - Confirmar se autenticação entra no épico; hoje está fora de escopo desta fatia.
 - Lista de endpoints e regras de votação (quórum, voto único, pauta).
-- Rodar dependency-check e registrar CVEs encontrados.
+- Rodar dependency-check com acesso ao KEV/NVD e registrar CVEs encontrados (bloqueado neste ambiente).
+- Boot 3.3.x sem suporte OSS: decidir migração para 3.4/3.5 ou aceitar o risco registrado em SPEC.
+- Autenticação e sign-off de escopo para endpoints abertos de voto (SPEC).
+- Achados não bloqueantes do review: `Allow` no 405, filtro 413 fora do `GlobalExceptionHandler`, filtro e form params, `ddl-auto: validate`, catch-all `Exception` engolindo `ErrorResponse`, testes de limite (255/2000, 64 KB).
 - Fatia 2: sessão de votação. Fatia 3: votos e resultado (409 usa o mesmo formato de erro).

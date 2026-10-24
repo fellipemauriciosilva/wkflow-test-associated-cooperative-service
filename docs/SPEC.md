@@ -31,3 +31,16 @@
 
 - Lista de endpoints e regras de votação (quórum, pauta, voto único).
 - Prioridade de entrega.
+
+## Fatia 1: Pautas (cadastro e consulta)
+
+Fonte completa: `docs/TASK-fatia-1.md`. Cada AC abaixo é verificado pelo teste indicado no `README.md`.
+
+- AC-1.1: POST /pautas com titulo válido retorna 201 com id. Teste: `PautaControllerTest#cadastraPautaComTituloERetornaId`.
+- AC-1.2: GET /pautas/{id} retorna a pauta cadastrada, status 200. Teste: `PautaControllerTest#consultaPautaExistente`.
+- AC-1.3: GET /pautas/{id} inexistente retorna 404 com erro NAO_ENCONTRADO. Teste: `PautaControllerTest#consultaPautaInexistenteRetorna404NoFormatoPadrao`.
+- AC-1.4: POST /pautas sem titulo (ausente ou em branco) retorna 400 com erro VALIDACAO_INVALIDA e mensagem citando titulo. Testes: `PautaControllerTest#cadastroSemTituloRetorna400`, `PautaControllerTest#cadastroComTituloEmBrancoRetorna400`.
+- AC-1.5: módulo sobe com Spring Boot 3, Java 21, H2 em memória e tabela PAUTA. Teste: `PautasApplicationTests#contextoSobeComH2EmMemoriaEComTabelaDePautas`.
+- AC-1.6: erros 400 e 404 têm exatamente as chaves status, erro, mensagem, path. Teste: `PautaControllerTest#erros400e404TemExatamenteAsMesmasChaves`.
+
+Verificação cruzada: os seis ACs acima batem com o texto de `docs/TASK-fatia-1.md`. Os testes de 405, 415, 406 e 500 cobrem o formato de erro de S1, mas não são ACs próprios.
