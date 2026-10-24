@@ -1,6 +1,7 @@
 package com.acme.pautas.web;
 
 import com.acme.pautas.service.PautaNaoEncontradaException;
+import com.acme.pautas.service.SessaoJaAbertaException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +29,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(PautaNaoEncontradaException.class)
     public ResponseEntity<ErroResponse> naoEncontrada(PautaNaoEncontradaException ex, HttpServletRequest request) {
         return resposta(HttpStatus.NOT_FOUND, "NAO_ENCONTRADO", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(SessaoJaAbertaException.class)
+    public ResponseEntity<ErroResponse> sessaoJaAberta(SessaoJaAbertaException ex, HttpServletRequest request) {
+        return resposta(HttpStatus.CONFLICT, "CONFLITO", ex.getMessage(), request);
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
