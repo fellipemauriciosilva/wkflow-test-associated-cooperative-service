@@ -9,9 +9,9 @@
 - `src/main/java/com/acme/pautas/config`: `RelogioConfig` (bean `Clock`, UTC do sistema).
 - `src/main/java/com/acme/pautas/repository`: `PautaRepository` (Spring Data JPA; `findWithLockById` com `PESSIMISTIC_WRITE`) e `SessaoRepository`.
 - `src/main/java/com/acme/pautas/service`: `PautaService` (cadastrar, buscar), `PautaNaoEncontradaException`, `SessaoService` (abrir) e `SessaoJaAbertaException`.
-- `src/main/java/com/acme/pautas/web`: `PautaController`, `SessaoController`, `PautaRequest`, `SessaoRequest` (`@Min(1)` em `duracaoMinutos`), `PautaResponse`, `SessaoResponse`, `ErroResponse`, `GlobalExceptionHandler` (`@RestControllerAdvice`), `LimiteTamanhoCorpoFilter` (corta body acima de 64 KB com 413).
+- `src/main/java/com/acme/pautas/web`: `PautaController`, `SessaoController`, `PautaRequest`, `SessaoRequest` (`@Min(1)` e `@Max(1440)` em `duracaoMinutos`), `PautaResponse`, `SessaoResponse`, `ErroResponse`, `GlobalExceptionHandler` (`@RestControllerAdvice`), `LimiteTamanhoCorpoFilter` (corta body acima de 64 KB com 413).
 - `src/main/resources`: `application.yml` (ddl `none`) e `schema.sql` (tabelas `pauta` e `sessao`, FK `sessao.pauta_id`).
-- `src/test`: `PautaControllerTest` (MockMvc, AC-1.1 a AC-1.4 e AC-1.6, 405/415/406), `GlobalExceptionHandlerTest` (500 direto no handler e 500 via rota com controller stub), `PautasApplicationTests` (contexto e tabela `PAUTA`, AC-1.5), `SessaoControllerTest` (AC-2.1 a AC-2.5), `SessaoConcorrenciaTest` (AC-2.6, 8 threads), `RelogioDeTeste` (`@TestConfiguration` com relógio ajustável, `@Primary`).
+- `src/test`: `PautaControllerTest` (MockMvc, AC-1.1 a AC-1.4 e AC-1.6, 405/415/406), `GlobalExceptionHandlerTest` (500 direto no handler e 500 via rota com controller stub), `PautasApplicationTests` (contexto e tabela `PAUTA`, AC-1.5), `SessaoControllerTest` (AC-2.1 a AC-2.5), `SessaoConcorrenciaTest` (AC-2.6, 8 threads, spy de 50 ms em `existsByPautaIdAndFimAfter`), `RelogioDeTeste` (`@TestConfiguration` com relógio ajustável, `@Primary`).
 - `docs/TASK-fatia-1.md`: cópia do task.md da fatia 1 (requisitos, ACs, premissas).
 
 ## Stack e comandos
@@ -41,6 +41,7 @@
 - Fatia 2: sessão aberta = `fim` depois de agora. Expirada não bloqueia. Premissas do task.md confirmadas na implementação.
 - Fatia 2: status 201, `duracaoMinutos` padrão 1, `fim` calculado no servidor pelo bean `Clock`.
 - Fatia 2: concorrência por `PESSIMISTIC_WRITE` na linha da pauta (`findWithLockById`), sem constraint única em `sessao.pauta_id`.
+- Fatia 2: `duracaoMinutos` com teto de 1440 (24 h). Acima disso, 400 `VALIDACAO_INVALIDA`, nada gravado. Valor proposto para fechar o gap de segurança (sem teto, um POST fechava a pauta por anos).
 - Autenticação fora de escopo nesta fatia (ver README). Endpoints de voto exigirão identificação antes da fatia 2.
 - `open-in-view` desligado.
 - Endpoints e regras de quórum/pauta de votação ficam em pendência até o solicitante enviar lista.
@@ -68,6 +69,9 @@
 - Testes de sessão usam `RelogioDeTeste` (`@Import` + `@Primary`) para fixar `abertura`/`fim`. Ao criar outro teste de tempo, importar a mesma classe.
 - Lock pessimista exige transação ativa: `SessaoService.abrir` é `@Transactional`. Não mover a checagem de sessão para fora dela.
 - Teste de concorrência (`SessaoConcorrenciaTest`) sobe contexto próprio e leva ~45 s.
+- Mutação sem lock (`findById` no lugar de `findWithLockById`): 3 de 3 runs falham com `expected: <1> but was: <8>`. Prova que o teste detecta a ausência do lock. Lock restaurado.
+- Spy com `@SpyBean` em interface Spring Data falha com "Cannot call abstract real method". Usar `mock(..., delegatesTo(repo))` e montar `SessaoService` à mão no teste.
+- `SessaoConcorrenciaTest` abre transação via `TransactionTemplate` por thread, porque o lock pessimista exige transação ativa.
 
 ## Pendências
 
@@ -82,4 +86,7 @@
 - Achados não bloqueantes do review: `Allow` no 405, filtro 413 fora do `GlobalExceptionHandler`, filtro e form params, `ddl-auto: validate`, catch-all `Exception` engolindo `ErrorResponse`, testes de limite (255/2000, 64 KB).
 - Fatia 2 (sessão de votação): fechamento manual (C2) e expiração/limpeza (C1) fora de escopo.
 - Fatia 3: votos e resultado (depende da sessão aberta da fatia 2).
-- Limite máximo de `duracaoMinutos` sem definição (gap do task.md). Hoje não há teto.
+- Teto de `duracaoMinutos` (1440) é proposta; confirmar com o solicitante.
+- Lock sem timeout (`jakarta.persistence.lock.timeout`) e exceção de lock caindo em 500 `ERRO_INTERNO`.
+- Invariante "uma sessão ativa por pauta" só no service. Índice `(pauta_id, fim)` pendente.
+- Mensagem do `@Min`/`@Max` não é asserted nos testes.
