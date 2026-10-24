@@ -5,11 +5,13 @@
 - `README.md`: estado atual, endpoints da fatia 1 (pautas) e mapeamento AC-1.x para testes.
 - `docs/SPEC.md`: escopo, modelo de ameaças e critérios de aceite (rascunho).
 - `src/main/java/com/acme/pautas/domain`: entidade `Pauta` (id `Long` gerado pelo banco, `titulo` até 255, `descricao` até 2000).
-- `src/main/java/com/acme/pautas/repository`: `PautaRepository` (Spring Data JPA).
-- `src/main/java/com/acme/pautas/service`: `PautaService` (cadastrar, buscar) e `PautaNaoEncontradaException`.
-- `src/main/java/com/acme/pautas/web`: `PautaController`, `PautaRequest` (`@NotBlank` e `@Size` em `titulo`, `@Size` em `descricao`), `PautaResponse`, `ErroResponse`, `GlobalExceptionHandler` (`@RestControllerAdvice`), `LimiteTamanhoCorpoFilter` (corta body acima de 64 KB com 413).
-- `src/main/resources`: `application.yml` (ddl `none`) e `schema.sql` (tabela `pauta`).
-- `src/test`: `PautaControllerTest` (MockMvc, AC-1.1 a AC-1.4 e AC-1.6, 405/415/406), `GlobalExceptionHandlerTest` (500 direto no handler e 500 via rota com controller stub), `PautasApplicationTests` (contexto e tabela `PAUTA`, AC-1.5).
+- `src/main/java/com/acme/pautas/domain`: entidade `Sessao` (`pautaId`, `abertura`, `fim` como `Instant`).
+- `src/main/java/com/acme/pautas/config`: `RelogioConfig` (bean `Clock`, UTC do sistema).
+- `src/main/java/com/acme/pautas/repository`: `PautaRepository` (Spring Data JPA; `findWithLockById` com `PESSIMISTIC_WRITE`) e `SessaoRepository`.
+- `src/main/java/com/acme/pautas/service`: `PautaService` (cadastrar, buscar), `PautaNaoEncontradaException`, `SessaoService` (abrir) e `SessaoJaAbertaException`.
+- `src/main/java/com/acme/pautas/web`: `PautaController`, `SessaoController`, `PautaRequest`, `SessaoRequest` (`@Min(1)` e `@Max(1440)` em `duracaoMinutos`), `PautaResponse`, `SessaoResponse`, `ErroResponse`, `GlobalExceptionHandler` (`@RestControllerAdvice`), `LimiteTamanhoCorpoFilter` (corta body acima de 64 KB com 413).
+- `src/main/resources`: `application.yml` (ddl `none`) e `schema.sql` (tabelas `pauta` e `sessao`, FK `sessao.pauta_id`).
+- `src/test`: `PautaControllerTest` (MockMvc, AC-1.1 a AC-1.4 e AC-1.6, 405/415/406), `GlobalExceptionHandlerTest` (500 direto no handler e 500 via rota com controller stub), `PautasApplicationTests` (contexto e tabela `PAUTA`, AC-1.5), `SessaoControllerTest` (AC-2.1 a AC-2.5), `SessaoConcorrenciaTest` (AC-2.6, 8 threads, spy de 50 ms em `existsByPautaIdAndFimAfter`), `RelogioDeTeste` (`@TestConfiguration` com relógio ajustável, `@Primary`).
 - `docs/TASK-fatia-1.md`: cópia do task.md da fatia 1 (requisitos, ACs, premissas).
 
 ## Stack e comandos
@@ -35,7 +37,11 @@
 - `titulo` vazio ou só espaços responde 400 (`@NotBlank`). Premissa do task.md.
 - Limites: `titulo` 255, `descricao` 2000, body 64 KB. Valores propostos, a confirmar com o solicitante.
 - Formato de erro `{status, erro, mensagem, path}` vale para o épico. Premissa a confirmar.
-- Códigos: 400/405/406/415 usam `VALIDACAO_INVALIDA`; 413 usa `PAYLOAD_MUITO_GRANDE`; 404 usa `NAO_ENCONTRADO`; 500 usa `ERRO_INTERNO` com mensagem fixa.
+- Códigos: 400/405/406/415 usam `VALIDACAO_INVALIDA`; 413 usa `PAYLOAD_MUITO_GRANDE`; 404 usa `NAO_ENCONTRADO`; 409 usa `CONFLITO`; 500 usa `ERRO_INTERNO` com mensagem fixa.
+- Fatia 2: sessão aberta = `fim` depois de agora. Expirada não bloqueia. Premissas do task.md confirmadas na implementação.
+- Fatia 2: status 201, `duracaoMinutos` padrão 1, `fim` calculado no servidor pelo bean `Clock`.
+- Fatia 2: concorrência por `PESSIMISTIC_WRITE` na linha da pauta (`findWithLockById`), sem constraint única em `sessao.pauta_id`.
+- Fatia 2: `duracaoMinutos` com teto de 1440 (24 h). Acima disso, 400 `VALIDACAO_INVALIDA`, nada gravado. Valor proposto para fechar o gap de segurança (sem teto, um POST fechava a pauta por anos).
 - Autenticação fora de escopo nesta fatia (ver README). Endpoints de voto exigirão identificação antes da fatia 2.
 - `open-in-view` desligado.
 - Endpoints e regras de quórum/pauta de votação ficam em pendência até o solicitante enviar lista.
@@ -47,6 +53,7 @@
 - Fatia 1 (épico `run_94bb0d49e2da`): módulo Maven Spring Boot 3 / Java 21 / H2, `POST /pautas`, `GET /pautas/{id}`, handler global de erros.
 - `c1d43ff` correções do review: JSON malformado, 405/415/406/413/500 no formato padrão, `@Size`, limite de body, schema fora do Hibernate, H2 com nome único por contexto, Boot 3.3.13. 17 testes verdes.
 - Ciclo 2 do review: 405/415/406 com chaves exatas e `mensagem`; 500 via rota MockMvc com controller stub; `dependency-check` vinculado a `verify` (execução bloqueada por falta de internet); `docs/SPEC.md` com AC-1.x mapeados a testes; `docs/TASK-fatia-1.md`. 18 testes verdes.
+- Fatia 2 (sessão de votação, épico `run_94bb0d49e2da`): `POST /pautas/{id}/sessao`, tabela `sessao`, `Clock` injetável, 409 via `GlobalExceptionHandler`, lock pessimista. 25 testes verdes.
 
 ## Armadilhas
 
@@ -59,6 +66,12 @@
 - Limite de body é filtro de servidor, não do proxy. Documentado aqui; proxy externo pode ter limite próprio.
 - Dependency-check não roda no `mvnd test`. Em `mvn verify` ele baixa o banco KEV da CISA (`www.cisa.gov`) e falha sem internet (`UnknownHostException`). Plugin 12.2.2 resolve no mirror, mas não há CVE report neste ambiente. Rodar com acesso à internet ou com banco NVD/KEV local.
 - Controller stub de teste de 500 fica em `GlobalExceptionHandlerTest`. Não mover para outra classe sem revisar o `standaloneSetup`.
+- Testes de sessão usam `RelogioDeTeste` (`@Import` + `@Primary`) para fixar `abertura`/`fim`. Ao criar outro teste de tempo, importar a mesma classe.
+- Lock pessimista exige transação ativa: `SessaoService.abrir` é `@Transactional`. Não mover a checagem de sessão para fora dela.
+- Teste de concorrência (`SessaoConcorrenciaTest`) sobe contexto próprio e leva ~45 s.
+- Mutação sem lock (`findById` no lugar de `findWithLockById`): 3 de 3 runs falham com `expected: <1> but was: <8>`. Prova que o teste detecta a ausência do lock. Lock restaurado.
+- Spy com `@SpyBean` em interface Spring Data falha com "Cannot call abstract real method". Usar `mock(..., delegatesTo(repo))` e montar `SessaoService` à mão no teste.
+- `SessaoConcorrenciaTest` abre transação via `TransactionTemplate` por thread, porque o lock pessimista exige transação ativa.
 
 ## Pendências
 
@@ -71,4 +84,9 @@
 - Boot 3.3.x sem suporte OSS: decidir migração para 3.4/3.5 ou aceitar o risco registrado em SPEC.
 - Autenticação e sign-off de escopo para endpoints abertos de voto (SPEC).
 - Achados não bloqueantes do review: `Allow` no 405, filtro 413 fora do `GlobalExceptionHandler`, filtro e form params, `ddl-auto: validate`, catch-all `Exception` engolindo `ErrorResponse`, testes de limite (255/2000, 64 KB).
-- Fatia 2: sessão de votação. Fatia 3: votos e resultado (409 usa o mesmo formato de erro).
+- Fatia 2 (sessão de votação): fechamento manual (C2) e expiração/limpeza (C1) fora de escopo.
+- Fatia 3: votos e resultado (depende da sessão aberta da fatia 2).
+- Teto de `duracaoMinutos` (1440) é proposta; confirmar com o solicitante.
+- Lock sem timeout (`jakarta.persistence.lock.timeout`) e exceção de lock caindo em 500 `ERRO_INTERNO`.
+- Invariante "uma sessão ativa por pauta" só no service. Índice `(pauta_id, fim)` pendente.
+- Mensagem do `@Min`/`@Max` não é asserted nos testes.
