@@ -16,6 +16,7 @@ public class Pauta {
     @Column(nullable = false)
     private String titulo;
 
+    @Column(length = 2000)
     private String descricao;
 
     protected Pauta() {

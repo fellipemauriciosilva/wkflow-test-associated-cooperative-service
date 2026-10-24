@@ -6,7 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @SpringBootTest
 class PautasApplicationTests {
@@ -19,11 +19,9 @@ class PautasApplicationTests {
 
     @Test
     void contextoSobeComH2EmMemoriaEComTabelaDePautas() {
-        assertNotNull(repository);
         Integer existe = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE UPPER(TABLE_NAME) = 'PAUTA'",
                 Integer.class);
-        assertNotNull(existe);
-        org.junit.jupiter.api.Assertions.assertEquals(1, existe);
+        assertEquals(1, existe);
     }
 }
