@@ -44,7 +44,7 @@ public class VotoService {
         }
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public ResultadoResponse resultado(Long pautaId) {
         pautas.findComLockPorId(pautaId).orElseThrow(() -> new PautaNaoEncontradaException(pautaId));
         if (sessoes.countAbertasEm(pautaId, relogio.instant()) > 0) {
