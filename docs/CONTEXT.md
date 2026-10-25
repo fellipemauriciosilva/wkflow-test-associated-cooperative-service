@@ -25,8 +25,9 @@
 
 - D1: 201 criação, 200 consulta, 400 validação, 404 não encontrado.
 - D2: erro padrão `{"status", "error", "message", "path"}`. `path` vem de `request.getRequestURI()`.
-- D2a: códigos `VALIDATION_ERROR` (400) e `NOT_FOUND` (404). Fatias 2 e 3 reusam. Pendente de confirmação.
-- D6: `titulo` obrigatório (não nulo, não vazio após trim). `descricao` opcional. Pendente de confirmação com dono do ticket.
+- D2a: códigos `VALIDATION_ERROR` (400), `NOT_FOUND` (404), `METHOD_NOT_ALLOWED` (405), `UNSUPPORTED_MEDIA_TYPE` (415), `INTERNAL_ERROR` (500). Fatias 2 e 3 reusam. Pendente de confirmação do dono do ticket para os códigos de 400 e 404.
+- D6: `titulo` obrigatório (não nulo, não vazio após trim, até 255 chars). `descricao` opcional (até 255 chars). Valores são aparados com `strip()` no service. Pendente de confirmação com dono do ticket.
+- D6b: limite de tamanho N = 255 para `titulo` e `descricao`. `@Size` em `PautaRequest` e `@Column(length)` em `Pauta` usam a mesma constante `Pauta.TAMANHO_MAXIMO`.
 - D6a: id gerado pelo banco.
 - Sem `Clock` nesta fatia (pauta não tem campo de tempo).
 - `open-in-view: false` em `application.yml`.
@@ -41,11 +42,16 @@
 - `curl` não existe na imagem. Para checar o proxy use `mvnd dependency:resolve`.
 - Saída do `mvnd` pode vir truncada. Confirmar sucesso pelo exit code e por `BUILD SUCCESS` em log (`> arquivo 2>&1`).
 - `@Valid` lança `MethodArgumentNotValidException`. O handler pega só o primeiro `FieldError`.
+- Handler `Exception` genérico captura tudo. Exceções do Spring com `ErrorResponse` mantêm o status original; o resto vira 500 `INTERNAL_ERROR` com log do servidor.
 - H2 em memória com `DB_CLOSE_DELAY=-1`: o contexto de teste compartilha o banco entre casos. Testes não devem depender de id fixo.
 
 ## Pendências
 
 - Confirmar D6 (campos da pauta) com dono do ticket. Se houver outros campos obrigatórios, ajustar `PautaRequest` e testes antes do merge.
 - Confirmar D2a (códigos de `error`) antes de iniciar fatia 2, pois viram contrato.
+- Limite de body JSON (request) não aplicado na app. Fazer no gateway/proxy (ex.: `client_max_body_size`).
+- Perfil de persistência: H2 em memória é o default único. Mover para profile `dev`/`test` e exigir datasource fora dele.
+- Múltiplos erros de campo: `TratadorErros` mostra só o primeiro. Decidir se é contrato.
+- Mensagens sem acento (`obrigatorio`, `Pauta nao encontrada`) por padrão do projeto. Padronizar em decisão separada.
 - Prioridade da fatia: sugerida alta, não confirmada.
 - 409 entra na fatia 2 (não se aplica aqui).
