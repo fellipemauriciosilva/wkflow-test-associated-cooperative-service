@@ -8,7 +8,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import br.coop.associados.votacao.web.LimiteBodyFilter;
 import com.jayway.jsonpath.JsonPath;
+import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -177,8 +179,34 @@ class PautaControllerTest {
         String grande = "{\"titulo\":\"x\",\"descricao\":\"" + "d".repeat(20 * 1024) + "\"}";
         mvc.perform(post("/pautas")
                         .contentType(MediaType.APPLICATION_JSON)
+                        .header("Content-Length", grande.getBytes(StandardCharsets.UTF_8).length)
                         .content(grande))
-                .andExpect(status().isPayloadTooLarge());
+                .andExpect(status().isPayloadTooLarge())
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.status").value(413))
+                .andExpect(jsonPath("$.error").value("Payload Too Large"))
+                .andExpect(jsonPath("$.message").value(LimiteBodyFilter.MENSAGEM_LIMITE))
+                .andExpect(jsonPath("$.path").value("/pautas"));
+    }
+
+    @Test
+    void corpoChunkedAcimaDoLimiteRetorna413SemContentLength() throws Exception {
+        String grande = "{\"titulo\":\"x\",\"descricao\":\"" + "d".repeat(20 * 1024) + "\"}";
+        mvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(grande))
+                .andExpect(status().isPayloadTooLarge())
+                .andExpect(jsonPath("$.status").value(413))
+                .andExpect(jsonPath("$.message").value(LimiteBodyFilter.MENSAGEM_LIMITE))
+                .andExpect(jsonPath("$.path").value("/pautas"));
+    }
+
+    @Test
+    void corpoChunkedDentroDoLimiteEhAceito() throws Exception {
+        mvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"titulo\":\"Chunked\"}"))
+                .andExpect(status().isCreated());
     }
 
     private static String corpo(String titulo, String descricao) {

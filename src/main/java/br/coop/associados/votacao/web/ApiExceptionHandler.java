@@ -30,6 +30,9 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErroResponse> corpoInvalido(HttpMessageNotReadableException ex, HttpServletRequest request) {
+        if (causadoPorLimite(ex)) {
+            return erro(HttpStatus.PAYLOAD_TOO_LARGE, LimiteBodyFilter.MENSAGEM_LIMITE, request);
+        }
         return erro(HttpStatus.BAD_REQUEST, "Corpo da requisição inválido", request);
     }
 
@@ -38,14 +41,26 @@ public class ApiExceptionHandler {
         return erro(HttpStatus.BAD_REQUEST, "Parâmetro 'id' inválido", request);
     }
 
+    private static boolean causadoPorLimite(Throwable ex) {
+        for (Throwable atual = ex; atual != null; atual = atual.getCause()) {
+            if (atual instanceof LimiteBodyFilter.LimiteExcedidoException) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static ResponseEntity<ErroResponse> erro(HttpStatus status, String message, HttpServletRequest request) {
-        ErroResponse body = new ErroResponse(
+        return ResponseEntity.status(status).body(corpo(status, message, request));
+    }
+
+    public static ErroResponse corpo(HttpStatus status, String message, HttpServletRequest request) {
+        return new ErroResponse(
                 Instant.now(),
                 status.value(),
                 status.getReasonPhrase(),
                 message,
                 request.getRequestURI());
-        return ResponseEntity.status(status).body(body);
     }
 
     public record ErroResponse(

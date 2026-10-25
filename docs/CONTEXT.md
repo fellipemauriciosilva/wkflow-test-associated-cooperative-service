@@ -23,7 +23,7 @@
 - `titulo`: obrigatório, em branco não é aceito, máximo 255 caracteres (`PautaRequest.TITULO_MAX`).
 - `descricao`: opcional, ausente ou `null` é aceita e devolvida como `null`, máximo 1000 caracteres (`PautaRequest.DESCRICAO_MAX`).
 - Acima do limite de campo: 400 com `message` listando o campo (`titulo: ...`, `descricao: ...`).
-- Limite do body: 16 KB (`LimiteBodyFilter.TAMANHO_MAXIMO_BYTES`), checado por `Content-Length`. Acima disso: 413.
+- Limite do body: 16 KB (`LimiteBodyFilter.TAMANHO_MAXIMO_BYTES`). Checado por `Content-Length` e, sem o header (chunked), pela contagem de bytes lidos no wrapper de `InputStream`. Acima disso: 413 com `ErroResponse` escrito direto pelo filtro (`message` `LimiteBodyFilter.MENSAGEM_LIMITE`).
 - JSON malformado: 400, `message` fixa `Corpo da requisição inválido`.
 - `id` não numérico em `GET /pautas/{id}`: 400, `message` fixa `Parâmetro 'id' inválido`.
 - Pauta inexistente: 404, `message` `Pauta não encontrada: {id}`.
@@ -36,14 +36,18 @@
 
 ## Armadilhas
 
-- `Content-Length` ausente (chunked) passa pelo `LimiteBodyFilter`. O limite real de body depende do proxy/gateway em produção.
-- Erros fora de `ApiExceptionHandler` (ex.: 500 inesperado) seguem o formato padrão do Spring Boot, não `ErroResponse`.
+- Limite de body é aplicado na leitura: o Jackson só consome até 16 KB, o restante não entra em memória. Proxy/gateway em produção continua necessário para limitar conexões.
+- Erros fora de `ApiExceptionHandler` (ex.: 500 inesperado, 405, 415, 404 de rota) seguem o formato padrão do Spring Boot, não `ErroResponse`.
 - `create-drop` apaga os dados a cada restart. Não usar em produção.
 
 ## Pendências
 
 - Autenticação e autorização: POST e GET estão abertos, com IDs sequenciais. Fora do escopo da fatia 1 (W3 do ticket). Decidir antes de subir.
-- Limite de body para requisições chunked: configurar `client_max_body_size` (ou equivalente) no proxy/gateway. Fora do escopo do código.
+- Limite de body para requisições chunked: a aplicação já corta na leitura. Mesmo assim, configurar `client_max_body_size` (ou equivalente) no proxy/gateway como defesa em profundidade. Fora do escopo do código.
+- GATE DE DEPLOY: `GET /pautas/{id}` e `POST /pautas` sem autenticação, com IDs sequenciais (enumeração de todas as pautas). Decidir autenticação antes de subir.
+- Erros 405, 415 e 404 de rota ainda no formato padrão do Spring Boot. Tratar em `ApiExceptionHandler` ou documentar exceção.
+- `parametroInvalido` fixa `'id'`. Trocar por `ex.getName()` antes das fatias 2/3 com outros parâmetros.
+- Asserts de mensagem de validação em `PautaControllerTest` usam `containsString`. Apertar para mensagem exata.
 - Escape de `descricao` no front-end (XSS armazenado): definir quem escapa. A API grava texto puro.
 - Regra de unicidade de título: pergunta de negócio, não implementada.
 - Profile de produção: `ddl-auto: validate` e banco real, separado do `application.yml`.
