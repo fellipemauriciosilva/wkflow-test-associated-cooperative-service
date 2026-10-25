@@ -1,7 +1,9 @@
 package com.acme.pautas.web;
 
 import com.acme.pautas.service.PautaNaoEncontradaException;
+import com.acme.pautas.service.SemSessaoAbertaException;
 import com.acme.pautas.service.SessaoJaAbertaException;
+import com.acme.pautas.service.VotoDuplicadoException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
@@ -34,6 +37,22 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(SessaoJaAbertaException.class)
     public ResponseEntity<ErroResponse> sessaoJaAberta(SessaoJaAbertaException ex, HttpServletRequest request) {
         return resposta(HttpStatus.CONFLICT, "CONFLITO", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(SemSessaoAbertaException.class)
+    public ResponseEntity<ErroResponse> semSessaoAberta(SemSessaoAbertaException ex, HttpServletRequest request) {
+        return resposta(HttpStatus.CONFLICT, "CONFLITO", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(VotoDuplicadoException.class)
+    public ResponseEntity<ErroResponse> votoDuplicado(VotoDuplicadoException ex, HttpServletRequest request) {
+        return resposta(HttpStatus.CONFLICT, "CONFLITO", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErroResponse> violacaoDeIntegridade(DataIntegrityViolationException ex,
+                                                              HttpServletRequest request) {
+        return resposta(HttpStatus.CONFLICT, "CONFLITO", "operação conflita com dados existentes", request);
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
