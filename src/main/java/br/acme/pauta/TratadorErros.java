@@ -30,6 +30,12 @@ public class TratadorErros {
         return responde(HttpStatus.CONFLICT, "CONFLICT", ex.getMessage(), request);
     }
 
+    @ExceptionHandler({SemSessaoAbertaException.class, VotoDuplicadoException.class,
+            ResultadoIndisponivelException.class})
+    ResponseEntity<ErroPadrao> conflito(RuntimeException ex, HttpServletRequest request) {
+        return responde(HttpStatus.CONFLICT, "CONFLICT", ex.getMessage(), request);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ErroPadrao> validacao(MethodArgumentNotValidException ex, HttpServletRequest request) {
         FieldError primeiro = ex.getBindingResult().getFieldErrors().get(0);
