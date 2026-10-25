@@ -42,8 +42,9 @@
 - Fatia 2: `duracaoMinutos` com teto de 1440 (24 h). Acima disso, 400 `VALIDACAO_INVALIDA`, nada gravado. Valor proposto.
 - Fatia 3: ordem de checagem do voto fixa: pauta (404) → body (400) → sessão aberta (409) → duplicidade (409).
 - Fatia 3: `VotoService.registrar` usa `findWithLockById` na pauta, igual à sessão. Serializa votos concorrentes do mesmo par sem depender só da constraint.
-- Fatia 3: `DataIntegrityViolationException` mapeada para 409 `CONFLITO` no handler, como rede de segurança da constraint.
-- Fatia 3: `associadoId` é string livre, não vazia, até 255 caracteres. Proposta a confirmar.
+- Fatia 3: `DataIntegrityViolationException` de `saveAndFlush` do voto é convertida em `VotoDuplicadoException` (409 `CONFLITO`) dentro de `VotoService`. O handler global não trata mais essa exceção, então violação de outra constraint continua 500.
+- Fatia 3: `associadoId` é normalizado antes de checar e gravar: `strip()` + NFC. Caixa é preservada (`a1` e `A1` são associados distintos). Decisão de caixa a confirmar com o solicitante.
+- Fatia 3: `associadoId` é string livre, não vazia, até 255 caracteres (após strip). Proposta a confirmar.
 - Fatia 3: resultado sem campo de status. Contagem por `GROUP BY` no banco, não lista em memória.
 - Autenticação fora de escopo nesta fatia (ver README). Endpoints de voto exigirão identificação antes de produção.
 - `open-in-view` desligado.
@@ -57,7 +58,7 @@
 - `c1d43ff` correções do review: JSON malformado, 405/415/406/413/500 no formato padrão, `@Size`, limite de body, schema fora do Hibernate, H2 com nome único por contexto, Boot 3.3.13. 17 testes verdes.
 - Ciclo 2 do review: 405/415/406 com chaves exatas e `mensagem`; 500 via rota MockMvc com controller stub; `dependency-check` vinculado a `verify`; `docs/SPEC.md` com AC-1.x mapeados; `docs/TASK-fatia-1.md`. 18 testes verdes.
 - Fatia 2 (sessão de votação): `POST /pautas/{id}/sessao`, tabela `sessao`, `Clock` injetável, 409 via `GlobalExceptionHandler`, lock pessimista. 25 testes verdes.
-- Fatia 3 (votos e resultado): `POST /pautas/{id}/votos`, `GET /pautas/{id}/resultado`, tabela `voto` com constraint única, lock pessimista na pauta, testes MockMvc, de repositório e de concorrência. Suite completa 45 testes verdes.
+- Fatia 3 (votos e resultado): `POST /pautas/{id}/votos`, `GET /pautas/{id}/resultado`, tabela `voto` com constraint única, lock pessimista na pauta, testes MockMvc, de repositório e de concorrência. Suite completa 45 testes verdes. Ciclo de correção do review: 55 testes verdes (normalização, unicidade por pauta, limites 255/256, precedência do body, teste de concorrência com asserts separados).
 
 ## Armadilhas
 
@@ -67,13 +68,15 @@
 - Teste de contexto usa `@SpringBootTest` com H2 em memória; sobe em ~45 s. Não usar Testcontainers (sem Docker).
 - Cada contexto Spring usa H2 próprio (`pautas-${random.uuid}`). Não voltar a nome fixo, senão contextos se atrapalham.
 - `schema.sql` roda em qualquer perfil. Ao criar perfil de produção, revisar isso.
-- Limite de body é filtro de servidor, não do proxy. Proxy externo pode ter limite próprio.
-- Dependency-check não roda no `mvnd test`. Em `mvn verify` ele baixa o banco KEV da CISA e falha sem internet (`UnknownHostException`).
+- Limite de body (64 KB) é filtro de servidor (`LimiteTamanhoCorpoFilter`), não do proxy. Proxy externo pode ter limite próprio. Limite documentado aqui e no SPEC.
+- Dependency-check não roda no `mvnd test`. Em `mvn verify` ele baixa o banco KEV da CISA (`www.cisa.gov`) e falha sem internet (`UnknownHostException`). Plugin 12.2.2 resolve no mirror, mas não há CVE report neste ambiente. Rodar com acesso à internet ou com banco NVD/KEV local.
 - Controller stub de teste de 500 fica em `GlobalExceptionHandlerTest`. Não mover sem revisar o `standaloneSetup`.
+- Premissas do task.md (`docs/TASK-fatia-1.md`) confirmadas na implementação: `titulo` vazio responde 400, `fim` calculado no servidor, sessão aberta = `agora < fim`.
 - Testes de tempo usam `RelogioDeTeste` (`@Import` + `@Primary`) para fixar relógio. Importar a mesma classe em testes novos.
 - Lock pessimista exige transação ativa: `SessaoService.abrir` e `VotoService.registrar` são `@Transactional`. Não mover checagens para fora.
 - Testes de concorrência abrem transação via `TransactionTemplate` por thread, porque o lock exige transação ativa.
-- Mutação sem lock em sessão (`findById` no lugar de `findWithLockById`): 3 de 3 runs falham com `expected: <1> but was: <8>`. Teste de voto ainda não recebeu mutação equivalente.
+- Mutação sem lock em sessão (`findById` no lugar de `findWithLockById`): 3 de 3 runs falham com `expected: <1> but was: <8>`. Mutação sem lock em voto (`findById` no lugar de `findWithLockById`): `VotoConcorrenciaTest` falha em `votosSimultaneosDoMesmoAssociadoGravamUmSoVoto:106` com `expected: <0> but was: <7>`. Sete votos caem na constraint, não na checagem da aplicação. Lock comprovado como necessário para a checagem.
+- Mutação `agora == fim` (`Instant.now(clock).minusNanos(1)` em `VotoService`): `VotoControllerTest#rejeitaVotoAposFimDaSessao:92` falha com `expected:<409> but was:<201>`. Fronteira exata coberta.
 - Spy com `@SpyBean` em interface Spring Data falha com "Cannot call abstract real method". Usar `mock(..., delegatesTo(repo))` e montar o service à mão.
 - Teste de repositório de voto precisa de pauta real: `pauta_id` sem linha na FK falha antes da constraint e dá falso positivo.
 
@@ -95,4 +98,9 @@
 - Lock sem timeout (`jakarta.persistence.lock.timeout`) e exceção de lock caindo em 500 `ERRO_INTERNO`.
 - Invariante "uma sessão ativa por pauta" só no service. Índice `(pauta_id, fim)` pendente.
 - Mensagem do `@Min`/`@Max` e do `@NotBlank`/`@Size` de voto não é asserted nos testes.
-- Teste de voto em sessão expirada cobre 409 mas não a fronteira exata `agora == fim` com mutação.
+- Lock sem timeout em voto e sessão (`jakarta.persistence.lock.timeout`). Contenção não medida; pool Hikari padrão 10. Sem carga, não há garantia.
+- Resultado público durante sessão aberta: `GET /resultado` não checa `fim` e não tem auth. Decidir visibilidade (bloquear até fechamento ou documentar como aceito).
+- Sem limite de volume de votos por pauta ou origem (sem auth, sem rate limit).
+- Endpoint de voto não pode ir a produção sem fatia de identificação do associado (bloqueio de deploy).
+- Lista de endpoints e regras de votação (quórum, pauta) continua pendente.
+- Lock de voto talvez redundante com a constraint para unicidade; mantido para checagem clara. Reavaliar com medição.
