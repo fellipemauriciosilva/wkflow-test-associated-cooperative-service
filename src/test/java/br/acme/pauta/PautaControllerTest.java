@@ -7,6 +7,7 @@ import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -16,13 +17,27 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@Import(PautaControllerTest.ErroInternoController.class)
 class PautaControllerTest {
+
+    @RestController
+    static class ErroInternoController {
+        @GetMapping("/teste/erro-interno")
+        void lanca() {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "segredo");
+        }
+    }
 
     private static final String CORPO_VALIDO = """
             {"titulo": "Aprovar contas", "descricao": "Contas do exercicio"}
@@ -240,6 +255,16 @@ class PautaControllerTest {
                 .andExpect(jsonPath("$.status").value(415))
                 .andExpect(jsonPath("$.error").value("UNSUPPORTED_MEDIA_TYPE"))
                 .andExpect(jsonPath("$.message").value(not(emptyString())));
+    }
+
+    @Test
+    void erroInterno_retorna500SemVazarMensagem() throws Exception {
+        mvc.perform(get("/teste/erro-interno"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.error").value("INTERNAL_ERROR"))
+                .andExpect(jsonPath("$.message").value("Erro interno do servidor"))
+                .andExpect(content().string(not(containsString("segredo"))));
     }
 
     private static String corpo(String titulo, String descricao) {

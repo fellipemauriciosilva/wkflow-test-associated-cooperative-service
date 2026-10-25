@@ -37,6 +37,7 @@
 
 - Fatia 1 (Pautas, `run_b490238a9dfb`): entidade, repositório, DTOs, erro padrão D2, service, controller, `application.yml`, testes AC-1.1 a AC-1.4 e caso de título em branco (S1). `mvnd test`: 5 testes, todos verdes.
 - Fora desta fatia (W1 a W4): listagem, atualização, remoção, autenticação, persistência durável, header `Location` só como pendência de Could (C1 já aplicado no 201).
+- Ciclo de correção do review: teste MockMvc de 500 (`ResponseStatusException` com "segredo" não vaza no body) em `PautaControllerTest`. `log.error` com stack já existe no ramo 5xx de `TratadorErros.inesperado`. `mvnd test`: 21 testes, verdes.
 
 ## Armadilhas
 
