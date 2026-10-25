@@ -5,9 +5,11 @@ import com.acme.pautas.domain.Voto;
 import com.acme.pautas.repository.PautaRepository;
 import com.acme.pautas.repository.SessaoRepository;
 import com.acme.pautas.repository.VotoRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.text.Normalizer;
 import java.time.Clock;
 import java.time.Instant;
 
@@ -32,10 +34,19 @@ public class VotoService {
         if (!sessoes.existsByPautaIdAndFimAfter(pautaId, Instant.now(clock))) {
             throw new SemSessaoAbertaException(pautaId);
         }
-        if (votos.existsByPautaIdAndAssociadoId(pautaId, associadoId)) {
-            throw new VotoDuplicadoException(pautaId, associadoId);
+        String associado = normalizar(associadoId);
+        if (votos.existsByPautaIdAndAssociadoId(pautaId, associado)) {
+            throw new VotoDuplicadoException(pautaId, associado);
         }
-        return votos.save(new Voto(pautaId, associadoId, opcao));
+        try {
+            return votos.saveAndFlush(new Voto(pautaId, associado, opcao));
+        } catch (DataIntegrityViolationException e) {
+            throw new VotoDuplicadoException(pautaId, associado, e);
+        }
+    }
+
+    private static String normalizar(String associadoId) {
+        return Normalizer.normalize(associadoId.strip(), Normalizer.Form.NFC);
     }
 
     @Transactional(readOnly = true)
