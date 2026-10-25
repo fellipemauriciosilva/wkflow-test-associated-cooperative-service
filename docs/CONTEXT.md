@@ -26,8 +26,9 @@
 - D1: 201 criação, 200 consulta, 400 validação, 404 não encontrado.
 - D2: erro padrão `{"status", "error", "message", "path"}`. `path` vem de `request.getRequestURI()`.
 - D2a: códigos `VALIDATION_ERROR` (400), `NOT_FOUND` (404), `METHOD_NOT_ALLOWED` (405), `UNSUPPORTED_MEDIA_TYPE` (415), `INTERNAL_ERROR` (500). Fatias 2 e 3 reusam. Pendente de confirmação do dono do ticket para os códigos de 400 e 404.
-- D6: `titulo` obrigatório (não nulo, não vazio após trim, até 255 chars). `descricao` opcional (até 255 chars). Valores são aparados com `strip()` no service. Pendente de confirmação com dono do ticket.
-- D6b: limite de tamanho N = 255 para `titulo` e `descricao`. `@Size` em `PautaRequest` e `@Column(length)` em `Pauta` usam a mesma constante `Pauta.TAMANHO_MAXIMO`.
+- D6: `titulo` obrigatório (não nulo, não vazio após trim, até 255 chars após trim). `descricao` opcional (até 255 chars após trim; vazia ou só espaços vira null). Aparagem com `strip()` no construtor compacto de `PautaRequest`, antes da validação. Pendente de confirmação com dono do ticket.
+- D6b: limite de tamanho N = 255 para `titulo` e `descricao`, medido em unidades UTF-16 (`String.length()`; emoji ocupa 2). `@Size` em `PautaRequest` e `@Column(length)` em `Pauta` usam a mesma constante `Pauta.TAMANHO_MAXIMO`.
+- D7: 5xx nunca expõe mensagem da exceção. Body genérico `Erro interno do servidor`, stack logada com `log.error`. Vale para `ErrorResponse` 5xx e exceções genéricas.
 - D6a: id gerado pelo banco.
 - Sem `Clock` nesta fatia (pauta não tem campo de tempo).
 - `open-in-view: false` em `application.yml`.
