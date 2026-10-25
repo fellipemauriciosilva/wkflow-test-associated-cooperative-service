@@ -138,4 +138,40 @@ class PautaControllerTest {
         assertThat(persistida.getTitulo()).isEqualTo("Aprovar contas");
         assertThat(persistida.getDescricao()).isEqualTo("Contas do exercicio");
     }
+
+    @Test
+    void criaPautaComTituloDe255CaracteresRetorna201ComTamanhoPreservado() throws Exception {
+        MvcResult criada = mvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"titulo\": \"" + "t".repeat(255) + "\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        Long id = ((Number) JsonPath.read(criada.getResponse().getContentAsString(), "$.id")).longValue();
+
+        assertThat(repository.findById(id).orElseThrow().getTitulo()).hasSize(255);
+    }
+
+    @Test
+    void criaPautaComDescricaoDe255CaracteresRetorna201ComTamanhoPreservado() throws Exception {
+        MvcResult criada = mvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"titulo\": \"Ok\", \"descricao\": \"" + "d".repeat(255) + "\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        Long id = ((Number) JsonPath.read(criada.getResponse().getContentAsString(), "$.id")).longValue();
+
+        assertThat(repository.findById(id).orElseThrow().getDescricao()).hasSize(255);
+    }
+
+    @Test
+    void corpoAcimaDoLimiteRetorna413SemPersistir() throws Exception {
+        String corpo = "{\"titulo\": \"Ok\", \"descricao\": \"" + "x".repeat(10_000) + "\"}";
+
+        mvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(corpo))
+                .andExpect(status().isPayloadTooLarge());
+
+        assertThat(repository.count()).isZero();
+    }
 }
