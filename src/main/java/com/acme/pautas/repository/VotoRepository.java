@@ -13,6 +13,8 @@ public interface VotoRepository extends JpaRepository<Voto, Long> {
 
     long countByPautaId(Long pautaId);
 
+    List<Voto> findByPautaId(Long pautaId);
+
     @Query("select v.opcao, count(v) from Voto v where v.pautaId = :pautaId group by v.opcao")
     List<Object[]> contarPorOpcao(@Param("pautaId") Long pautaId);
 }

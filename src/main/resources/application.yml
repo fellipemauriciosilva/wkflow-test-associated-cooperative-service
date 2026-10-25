@@ -13,3 +13,7 @@ spring:
     hibernate:
       ddl-auto: none
     open-in-view: false
+
+pautas:
+  votos:
+    habilitado: ${PAUTAS_VOTOS_HABILITADO:false}

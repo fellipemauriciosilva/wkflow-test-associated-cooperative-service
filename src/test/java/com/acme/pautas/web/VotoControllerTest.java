@@ -1,6 +1,7 @@
 package com.acme.pautas.web;
 
 import com.acme.pautas.RelogioDeTeste;
+import com.acme.pautas.domain.OpcaoVoto;
 import com.acme.pautas.domain.Voto;
 import com.acme.pautas.repository.VotoRepository;
 import com.acme.pautas.service.PautaService;
@@ -31,7 +32,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(properties = "pautas.votos.habilitado=true")
 @AutoConfigureMockMvc
 @Import(RelogioDeTeste.class)
 class VotoControllerTest {
@@ -234,6 +235,18 @@ class VotoControllerTest {
                 .andExpect(jsonPath("$.erro").value("VALIDACAO_INVALIDA"));
 
         assertEquals(0, votos.countByPautaId(pautaId));
+    }
+
+    @Test
+    void rejeitaVotoDuplicadoComConflito() throws Exception {
+        Long pautaId = pautaComSessao("Pauta voto duplicado", 5);
+        votos.saveAndFlush(new Voto(pautaId, "a1", OpcaoVoto.SIM));
+
+        mvc.perform(votar(pautaId, "{\"associadoId\": \"a1\", \"voto\": \"NAO\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.erro").value("CONFLITO"));
+
+        assertEquals(1, votos.countByPautaId(pautaId));
     }
 
     @Test

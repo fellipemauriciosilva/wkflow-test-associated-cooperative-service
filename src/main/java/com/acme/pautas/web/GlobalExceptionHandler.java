@@ -1,8 +1,10 @@
 package com.acme.pautas.web;
 
+import com.acme.pautas.service.AssociadoInvalidoException;
 import com.acme.pautas.service.PautaNaoEncontradaException;
 import com.acme.pautas.service.SemSessaoAbertaException;
 import com.acme.pautas.service.SessaoJaAbertaException;
+import com.acme.pautas.service.VotacaoIndisponivelException;
 import com.acme.pautas.service.VotoDuplicadoException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -46,6 +48,17 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(VotoDuplicadoException.class)
     public ResponseEntity<ErroResponse> votoDuplicado(VotoDuplicadoException ex, HttpServletRequest request) {
         return resposta(HttpStatus.CONFLICT, "CONFLITO", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(AssociadoInvalidoException.class)
+    public ResponseEntity<ErroResponse> associadoInvalido(AssociadoInvalidoException ex, HttpServletRequest request) {
+        return resposta(HttpStatus.BAD_REQUEST, "VALIDACAO_INVALIDA", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(VotacaoIndisponivelException.class)
+    public ResponseEntity<ErroResponse> votacaoIndisponivel(VotacaoIndisponivelException ex,
+                                                            HttpServletRequest request) {
+        return resposta(HttpStatus.SERVICE_UNAVAILABLE, "INDISPONIVEL", ex.getMessage(), request);
     }
 
     @ExceptionHandler(NoResourceFoundException.class)

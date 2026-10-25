@@ -40,11 +40,12 @@
 - Fatia 2: sessão aberta = `fim` depois de agora. Expirada não bloqueia. Status 201, `duracaoMinutos` padrão 1, `fim` calculado no servidor pelo bean `Clock`.
 - Fatia 2: concorrência por `PESSIMISTIC_WRITE` na linha da pauta (`findWithLockById`), sem constraint única em `sessao.pauta_id`.
 - Fatia 2: `duracaoMinutos` com teto de 1440 (24 h). Acima disso, 400 `VALIDACAO_INVALIDA`, nada gravado. Valor proposto.
-- Fatia 3: ordem de checagem do voto fixa: pauta (404) → body (400) → sessão aberta (409) → duplicidade (409).
+- Fatia 3: ordem de checagem do voto fixa: body (400) → pauta (404) → sessão aberta (409) → duplicidade (409). Body é validado por `@Valid` antes do service.
 - Fatia 3: `VotoService.registrar` usa `findWithLockById` na pauta, igual à sessão. Serializa votos concorrentes do mesmo par sem depender só da constraint.
-- Fatia 3: `DataIntegrityViolationException` de `saveAndFlush` do voto é convertida em `VotoDuplicadoException` (409 `CONFLITO`) dentro de `VotoService`. O handler global não trata mais essa exceção, então violação de outra constraint continua 500.
+- Fatia 3: `DataIntegrityViolationException` de `saveAndFlush` vira `VotoDuplicadoException` (409 `CONFLITO`) só se a cadeia de causas tiver `ConstraintViolationException` com nome contendo `UK_VOTO_PAUTA_ASSOCIADO`. Outras violações (FK, NOT NULL) são relançadas e viram 500. Nome real no H2: `PUBLIC.UK_VOTO_PAUTA_ASSOCIADO_INDEX_2`, por isso `contains`.
+- Fatia 3: endpoint de voto desligado por padrão (`pautas.votos.habilitado`, env `PAUTAS_VOTOS_HABILITADO`). Desligado responde 503 `INDISPONIVEL`. `VotosProducaoGuard` falha na subida se a flag estiver ligada com perfil `prod`.
 - Fatia 3: `associadoId` é normalizado antes de checar e gravar: `strip()` + NFC. Caixa é preservada (`a1` e `A1` são associados distintos). Decisão de caixa a confirmar com o solicitante.
-- Fatia 3: `associadoId` é string livre, não vazia, até 255 caracteres (após strip). Proposta a confirmar.
+- Fatia 3: `associadoId` é string livre, não vazia, até 255 code points após `strip()` + NFC (não UTF-16; emoji conta 1). Validado no service, não no DTO. Proposta a confirmar.
 - Fatia 3: resultado sem campo de status. Contagem por `GROUP BY` no banco, não lista em memória.
 - Autenticação fora de escopo nesta fatia (ver README). Endpoints de voto exigirão identificação antes de produção.
 - `open-in-view` desligado.
@@ -101,6 +102,7 @@
 - Lock sem timeout em voto e sessão (`jakarta.persistence.lock.timeout`). Contenção não medida; pool Hikari padrão 10. Sem carga, não há garantia.
 - Resultado público durante sessão aberta: `GET /resultado` não checa `fim` e não tem auth. Decidir visibilidade (bloquear até fechamento ou documentar como aceito).
 - Sem limite de volume de votos por pauta ou origem (sem auth, sem rate limit).
-- Endpoint de voto não pode ir a produção sem fatia de identificação do associado (bloqueio de deploy).
+- Endpoint de voto não pode ir a produção sem fatia de identificação do associado. Trava atual: flag `pautas.votos.habilitado` (default false) + `VotosProducaoGuard` em `prod`. Trava de pipeline (falhar build se flag ligada em config de prod) ainda não existe.
+- Nota "duração do teste de concorrência" citada no review não existe no histórico do CONTEXT; não restaurada.
 - Lista de endpoints e regras de votação (quórum, pauta) continua pendente.
 - Lock de voto talvez redundante com a constraint para unicidade; mantido para checagem clara. Reavaliar com medição.
