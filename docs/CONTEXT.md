@@ -15,7 +15,7 @@
 
 - Java 21, Spring Boot 3.3.5, Maven. Starters: web, data-jpa, validation, test. H2 runtime.
 - Build e testes: `mvnd test` (sem `clean`). Teste único: `mvnd test -Dtest='PautaControllerTest#metodo'`.
-- Testes usam `@ActiveProfiles("test")`, mas não têm config própria: datasource e schema vêm do `application.yml`.
+- Testes usam `@ActiveProfiles("test")`. Datasource H2 in-memory e `ddl-auto: create-drop` vêm de `src/test/resources/application-test.yml`.
 - Dependências resolvem pelo proxy interno (`ORQALIZ_ARTIFACT_PROXY_MAVEN_URL`). Sem `settings.xml` no ambiente; o Maven resolveu sem configuração extra.
 - Sem `curl` nem `python3` no ambiente.
 
@@ -35,7 +35,7 @@
 - Validação: campo ausente ou vazio retorna 400 em `ProblemDetail` (proposta, decisão 5 em aberto).
 - Tamanho: `titulo` e `descricao` limitados a 255 caracteres por `@Size(max = 255)` no `PautaRequest`, batendo com a coluna default `VARCHAR(255)`. Excedente retorna 400, não 500.
 - Limite de body: 4096 bytes no `LimiteTamanhoCorpoFilter` (aplicação, não só gateway). Excedente retorna 413.
-- Configuração de banco: `application.yml` define datasource H2 in-memory (`DB_CLOSE_DELAY=-1`) e `ddl-auto: create-drop`. Sem profile, a aplicação sobe com schema pronto e `POST /pautas` retorna 201.
+- Configuração de banco: `application.yml` base não define datasource e usa `ddl-auto: validate`. Sem profile, o Boot cria um H2 embutido (H2 está no classpath) e `validate` falha no boot porque a tabela `pauta` não existe. Não há `create-drop` fora do profile test. H2 in-memory (`DB_CLOSE_DELAY=-1`) e `create-drop` ficam só em `application-test.yml`.
 - GET com ID inexistente lança `ResponseStatusException(NOT_FOUND)`, respondido como `ProblemDetail`.
 
 ## Mapeamento de critérios de aceitação (fatia 1)
@@ -50,13 +50,13 @@
 ## Entregas
 
 - Fatia 1 (cadastro e consulta de pautas): AC-1.1 a AC-1.5 cobertos por `PautaControllerTest`.
-- Correções do review: teste de `descricao` opcional, limite de 255 caracteres (aceite e rejeição), config de banco no `application.yml` com schema garantido no boot padrão, limite de body na aplicação, isolamento determinístico, `Location` com asserção exata.
+- Correções do review: teste de `descricao` opcional, limite de 255 caracteres (aceite e rejeição), config de banco movida para `application-test.yml` (base sem datasource e com `validate`, para evitar `create-drop` em produção), teste de configuração base (`ConfiguracaoPadraoTest`), limite de body na aplicação, isolamento determinístico, `Location` com asserção exata.
 
 ## Armadilhas
 
 - `ResponseStatusException` precisa de `spring.mvc.problemdetails.enabled` para sair como `ProblemDetail`.
-- Com H2 e `create-drop`, usar `DB_CLOSE_DELAY=-1` para não perder dados entre conexões.
-- `create-drop` é só para H2 de dev e teste. Antes de banco real, trocar por migração (Flyway) e remover `create-drop`.
+- Com H2 e `create-drop` (só em `application-test.yml`), usar `DB_CLOSE_DELAY=-1` para não perder dados entre conexões.
+- Base com `ddl-auto: validate` e sem datasource: boot sem profile cai no H2 embutido, que é efêmero, e falha no validate. Para produção, definir datasource real e migração antes de subir.
 - `mvnd test` sem `clean` é o fluxo esperado neste ambiente.
 - `maxPostSize` do Tomcat cobre form, não corpo JSON. Para JSON, o limite é o `LimiteTamanhoCorpoFilter`.
 
@@ -72,4 +72,6 @@
 - Dependências sem verificação de CVE (sem ferramenta SCA no ambiente). Sugerido OWASP dependency-check no build.
 - Fatias 2 (sessão e votos) e 3 (resultado) dependem do contrato de `{id}` (tipo `Long`).
 - Fatia 2: `repository.deleteAll()` quebra com FK de votos para `pauta`. Ajustar isolamento ao criar a tabela de votos.
+- Schema para produção: não há Flyway nem `V1__create_pauta.sql`. Antes de banco real, criar migração e subir com `validate`. Pendente.
+- Boot sem profile com schema pronto não tem teste de integração. `ConfiguracaoPadraoTest` só verifica o YAML base.
 - C1 (Springdoc) fica no epic.
