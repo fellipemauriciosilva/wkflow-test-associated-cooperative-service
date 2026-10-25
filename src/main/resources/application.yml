@@ -1,9 +1,0 @@
-spring:
-  application:
-    name: wkflow-test-associated-cooperative-service
-  jpa:
-    hibernate:
-      ddl-auto: validate
-  mvc:
-    problemdetails:
-      enabled: true
