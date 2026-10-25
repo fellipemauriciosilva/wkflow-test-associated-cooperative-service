@@ -33,6 +33,9 @@ import static org.mockito.Mockito.mock;
 class VotoConcorrenciaTest {
 
     private static final int THREADS = 8;
+    private static final String GRAVADO = "gravado";
+    private static final String REJEITADO_PELA_APLICACAO = "rejeitado-aplicacao";
+    private static final String REJEITADO_PELA_CONSTRAINT = "rejeitado-constraint";
 
     @Autowired
     private PautaRepository pautasRepositorio;
@@ -72,34 +75,36 @@ class VotoConcorrenciaTest {
         ExecutorService executor = Executors.newFixedThreadPool(THREADS);
         CyclicBarrier barreira = new CyclicBarrier(THREADS);
         try {
-            List<Future<Boolean>> resultados = new ArrayList<>();
+            List<Future<String>> resultados = new ArrayList<>();
             for (int i = 0; i < THREADS; i++) {
-                Callable<Boolean> voto = () -> {
+                Callable<String> voto = () -> {
                     barreira.await();
                     try {
                         transacao.executeWithoutResult(status ->
                                 servico.registrar(pautaId, "a1", OpcaoVoto.SIM));
-                        return true;
+                        return GRAVADO;
                     } catch (VotoDuplicadoException e) {
-                        return false;
+                        return e.getCause() == null ? REJEITADO_PELA_APLICACAO : REJEITADO_PELA_CONSTRAINT;
                     }
                 };
                 resultados.add(executor.submit(voto));
             }
 
             long gravados = 0;
-            long rejeitados = 0;
-            for (Future<Boolean> resultado : resultados) {
-                if (resultado.get()) {
-                    gravados++;
-                } else {
-                    rejeitados++;
+            long pelaAplicacao = 0;
+            long pelaConstraint = 0;
+            for (Future<String> resultado : resultados) {
+                switch (resultado.get()) {
+                    case GRAVADO -> gravados++;
+                    case REJEITADO_PELA_APLICACAO -> pelaAplicacao++;
+                    default -> pelaConstraint++;
                 }
             }
 
-            assertEquals(1, gravados);
-            assertEquals(THREADS - 1, rejeitados);
-            assertEquals(1, votosRepositorio.countByPautaId(pautaId));
+            assertEquals(1, gravados, "exatamente um voto gravado");
+            assertEquals(THREADS - 1, pelaAplicacao + pelaConstraint, "demais rejeitados com 409");
+            assertEquals(0, pelaConstraint, "lock deve impedir que a constraint seja o único guarda");
+            assertEquals(1, votosRepositorio.countByPautaId(pautaId), "contagem final 1");
         } finally {
             executor.shutdownNow();
         }
