@@ -1,15 +1,22 @@
 package br.acme.pauta;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.assertj.core.api.Assertions.assertThat;
 
 import com.jayway.jsonpath.JsonPath;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,16 +25,16 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import(SessaoControllerTest.RelogioDeTeste.class)
+@TestPropertySource(properties = "spring.datasource.url=jdbc:h2:mem:sessao;DB_CLOSE_DELAY=-1")
 class SessaoControllerTest {
 
     private static final Instant T0 = Instant.parse("2026-01-01T12:00:00Z");
@@ -83,11 +90,12 @@ class SessaoControllerTest {
     }
 
     @Test
-    void abrirSessaoComDuracao_gravaInicioEFimComDuracaoInformada() throws Exception {
+    void abrirSessaoComDuracaoGravaInicioEFimComDuracaoInformada() throws Exception {
         long pautaId = criarPauta("Duracao informada");
 
         abrirSessao(pautaId, "{\"duracaoMinutos\": 5}")
                 .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").exists())
                 .andExpect(jsonPath("$.pautaId").value(pautaId))
                 .andExpect(jsonPath("$.inicio").value(T0.toString()))
                 .andExpect(jsonPath("$.fim").value(T0.plusSeconds(300).toString()))
@@ -99,7 +107,7 @@ class SessaoControllerTest {
     }
 
     @Test
-    void abrirSessaoSemCorpo_usaDuracaoPadraoDeUmMinuto() throws Exception {
+    void abrirSessaoSemCorpoUsaDuracaoPadraoDeUmMinuto() throws Exception {
         long pautaId = criarPauta("Sem corpo");
 
         abrirSessao(pautaId, null)
@@ -109,7 +117,7 @@ class SessaoControllerTest {
     }
 
     @Test
-    void abrirSessaoSemCampoDuracao_usaDuracaoPadraoDeUmMinuto() throws Exception {
+    void abrirSessaoSemCampoDuracaoUsaDuracaoPadraoDeUmMinuto() throws Exception {
         long pautaId = criarPauta("Sem campo");
 
         abrirSessao(pautaId, "{}")
@@ -118,7 +126,7 @@ class SessaoControllerTest {
     }
 
     @Test
-    void abrirSessaoComDuracaoDez_respeitaValorInformado() throws Exception {
+    void abrirSessaoComDuracaoDezRespeitaValorInformado() throws Exception {
         long pautaId = criarPauta("Dez minutos");
 
         abrirSessao(pautaId, "{\"duracaoMinutos\": 10}")
@@ -128,7 +136,7 @@ class SessaoControllerTest {
     }
 
     @Test
-    void abrirSessaoEmPautaInexistente_retorna404FormatoPadrao() throws Exception {
+    void abrirSessaoEmPautaInexistenteRetorna404FormatoPadrao() throws Exception {
         abrirSessao(999999L, null)
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
@@ -138,7 +146,7 @@ class SessaoControllerTest {
     }
 
     @Test
-    void abrirSessaoDuplicadaComSessaoAberta_retorna409SemCriarNova() throws Exception {
+    void abrirSessaoDuplicadaComSessaoAbertaRetorna409SemCriarNova() throws Exception {
         long pautaId = criarPauta("Duplicada");
         abrirSessao(pautaId, "{\"duracaoMinutos\": 5}").andExpect(status().isCreated());
 
@@ -153,7 +161,7 @@ class SessaoControllerTest {
     }
 
     @Test
-    void abrirSessaoAposFimDaAnterior_retorna201() throws Exception {
+    void abrirSessaoAposFimDaAnteriorRetorna201() throws Exception {
         long pautaId = criarPauta("Encerrada");
         abrirSessao(pautaId, "{\"duracaoMinutos\": 1}").andExpect(status().isCreated());
 
@@ -166,7 +174,34 @@ class SessaoControllerTest {
     }
 
     @Test
-    void abrirSessaoComDuracaoZero_retorna400CitandoCampo() throws Exception {
+    void abrirSessaoConcorrenteNaMesmaPautaUmCriaOutroRecebe409() throws Exception {
+        long pautaId = criarPauta("Concorrente");
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        CountDownLatch largada = new CountDownLatch(1);
+        List<Future<Integer>> resultados = new ArrayList<>();
+        try {
+            for (int i = 0; i < 2; i++) {
+                resultados.add(pool.submit(() -> {
+                    largada.await();
+                    return abrirSessao(pautaId, "{\"duracaoMinutos\": 5}")
+                            .andReturn().getResponse().getStatus();
+                }));
+            }
+            largada.countDown();
+            List<Integer> statuses = new ArrayList<>();
+            for (Future<Integer> resultado : resultados) {
+                statuses.add(resultado.get(30, TimeUnit.SECONDS));
+            }
+            assertThat(statuses).containsExactlyInAnyOrder(201, 409);
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertThat(sessoes.findByPautaId(pautaId)).hasSize(1);
+    }
+
+    @Test
+    void abrirSessaoComDuracaoZeroRetorna400CitandoCampo() throws Exception {
         long pautaId = criarPauta("Duracao zero");
 
         abrirSessao(pautaId, "{\"duracaoMinutos\": 0}")
@@ -176,30 +211,82 @@ class SessaoControllerTest {
     }
 
     @Test
-    void abrirSessaoComDuracaoNegativa_retorna400CitandoCampo() throws Exception {
+    void abrirSessaoComDuracaoNegativaRetorna400CitandoCampo() throws Exception {
         long pautaId = criarPauta("Duracao negativa");
 
         abrirSessao(pautaId, "{\"duracaoMinutos\": -3}")
                 .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.message").value(containsString("duracaoMinutos")));
     }
 
     @Test
-    void abrirSessaoComDuracaoFracionaria_retorna400CitandoCampo() throws Exception {
+    void abrirSessaoComDuracaoFracionariaRetorna400CitandoCampo() throws Exception {
         long pautaId = criarPauta("Duracao fracionaria");
 
         abrirSessao(pautaId, "{\"duracaoMinutos\": 1.5}")
                 .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.message").value(containsString("duracaoMinutos")));
     }
 
     @Test
-    void sessaoComFimIgualAoAgora_nao_contaComoAberta() throws Exception {
+    void abrirSessaoAcimaDoTetoRetorna400CitandoCampo() throws Exception {
+        long pautaId = criarPauta("Acima do teto");
+
+        abrirSessao(pautaId, "{\"duracaoMinutos\": 1441}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").value(containsString("duracaoMinutos")));
+    }
+
+    @Test
+    void abrirSessaoNoTetoEAceita() throws Exception {
+        long pautaId = criarPauta("No teto");
+
+        abrirSessao(pautaId, "{\"duracaoMinutos\": 1440}")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.duracaoMinutos").value(1440));
+    }
+
+    @Test
+    void abrirSessaoComDuracaoEmStringNumericaAceitaPorCoercao() throws Exception {
+        long pautaId = criarPauta("String numerica");
+
+        abrirSessao(pautaId, "{\"duracaoMinutos\": \"5\"}")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.duracaoMinutos").value(5));
+    }
+
+    @Test
+    void abrirSessaoComTipoJsonInvalidoEmDuracaoRetorna400() throws Exception {
+        long pautaId = criarPauta("Tipo invalido");
+
+        abrirSessao(pautaId, "{\"duracaoMinutos\": \"abc\"}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").value("corpo: JSON invalido"));
+        abrirSessao(pautaId, "{\"duracaoMinutos\": true}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").value("corpo: JSON invalido"));
+        abrirSessao(pautaId, "{\"duracaoMinutos\": [1]}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").value("corpo: JSON invalido"));
+
+        assertThat(sessoes.findByPautaId(pautaId)).isEmpty();
+    }
+
+    @Test
+    void sessaoComFimIgualAoAgoraNaoContaComoAberta() throws Exception {
         long pautaId = criarPauta("Limite fim exclusivo");
         abrirSessao(pautaId, "{\"duracaoMinutos\": 1}").andExpect(status().isCreated());
 
         relogio.avancarPara(T0.plusSeconds(60));
-        abrirSessao(pautaId, "{\"duracaoMinutos\": 1}").andExpect(status().isCreated());
+        abrirSessao(pautaId, "{\"duracaoMinutos\": 1}")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.inicio").value(T0.plusSeconds(60).toString()));
     }
 
     private long criarPauta(String titulo) throws Exception {
@@ -217,9 +304,5 @@ class SessaoControllerTest {
             requisicao.contentType(MediaType.APPLICATION_JSON).content(corpo);
         }
         return mvc.perform(requisicao);
-    }
-
-    private ResultActions abrirSessao(Long pautaId, String corpo) throws Exception {
-        return abrirSessao(pautaId.longValue(), corpo);
     }
 }
