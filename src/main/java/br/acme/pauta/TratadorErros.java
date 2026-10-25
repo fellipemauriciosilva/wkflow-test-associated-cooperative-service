@@ -25,6 +25,11 @@ public class TratadorErros {
         return responde(HttpStatus.NOT_FOUND, "NOT_FOUND", ex.getMessage(), request);
     }
 
+    @ExceptionHandler(SessaoAbertaException.class)
+    ResponseEntity<ErroPadrao> sessaoAberta(SessaoAbertaException ex, HttpServletRequest request) {
+        return responde(HttpStatus.CONFLICT, "CONFLICT", ex.getMessage(), request);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ErroPadrao> validacao(MethodArgumentNotValidException ex, HttpServletRequest request) {
         FieldError primeiro = ex.getBindingResult().getFieldErrors().get(0);
