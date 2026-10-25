@@ -2,6 +2,7 @@ package br.acme.pauta;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Locale;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,20 +37,31 @@ public class VotoService {
                     OpcaoVoto.valueOf(request.opcao()), agora));
             return VotoResponse.de(voto);
         } catch (DataIntegrityViolationException e) {
-            throw new VotoDuplicadoException(pautaId);
+            if (violaRestricaoUnica(e)) {
+                throw new VotoDuplicadoException(pautaId);
+            }
+            throw e;
         }
     }
 
     @Transactional(readOnly = true)
     public ResultadoResponse resultado(Long pautaId) {
-        if (!pautas.existsById(pautaId)) {
-            throw new PautaNaoEncontradaException(pautaId);
-        }
+        pautas.findComLockPorId(pautaId).orElseThrow(() -> new PautaNaoEncontradaException(pautaId));
         if (sessoes.countAbertasEm(pautaId, relogio.instant()) > 0) {
             throw new ResultadoIndisponivelException(pautaId);
         }
         long sim = votos.countByPautaIdAndOpcao(pautaId, OpcaoVoto.SIM);
         long nao = votos.countByPautaIdAndOpcao(pautaId, OpcaoVoto.NAO);
         return new ResultadoResponse(sim, nao, sim + nao);
+    }
+
+    static boolean violaRestricaoUnica(Throwable erro) {
+        for (Throwable atual = erro; atual != null; atual = atual.getCause()) {
+            String mensagem = atual.getMessage();
+            if (mensagem != null && mensagem.toLowerCase(Locale.ROOT).contains(Voto.RESTRICAO_UNICA)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

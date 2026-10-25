@@ -1,6 +1,7 @@
 package br.acme.pauta;
 
 import jakarta.validation.constraints.NotBlank;
+import java.util.Locale;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -13,4 +14,8 @@ public record VotoRequest(
         @NotNull(message = "obrigatorio")
         @Pattern(regexp = "SIM|NAO", message = "deve ser SIM ou NAO")
         String opcao) {
+
+    public VotoRequest {
+        associadoId = associadoId == null ? null : associadoId.strip().toLowerCase(Locale.ROOT);
+    }
 }

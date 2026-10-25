@@ -10,7 +10,7 @@
   - Fatia 2: `SessaoRequest` (entrada, `duracaoMinutos` opcional, teto `DURACAO_MAXIMA_MINUTOS = 1440`), `SessaoResponse` (saída), `SessaoAbertaException` (409).
   - Fatia 2: `RelogioConfig` expõe bean `Clock` (`systemUTC`). Serviço não usa `Instant.now()`.
   - Fatia 3: `Voto` (entidade JPA, FKs `pauta_id` e `sessao_id`, `UNIQUE (pauta_id, associado_id)` na anotação `@Table`), `OpcaoVoto` (enum SIM/NAO), `VotoRepository` (`existsByPautaIdAndAssociadoId`, `countByPautaIdAndOpcao`, `findByPautaId`).
-  - Fatia 3: `VotoService` (`registrar`, `resultado`), `VotoController` (`POST /pautas/{id}/votos` 201, `GET /pautas/{id}/resultado` 200), `VotoRequest` (`associadoId` `@NotBlank`, `opcao` `@Pattern SIM|NAO`), `VotoResponse`, `ResultadoResponse` (`sim`, `nao`, `total`).
+  - Fatia 3: `VotoService` (`registrar`, `resultado`), `VotoController` (`POST /pautas/{id}/votos` 201, `GET /pautas/{id}/resultado` 200), `VotoRequest` (`associadoId` `@NotBlank` `@Size(255)`, normalizado com strip e lowercase `Locale.ROOT` no construtor compacto; `opcao` `@Pattern SIM|NAO`), `VotoResponse`, `ResultadoResponse` (`sim`, `nao`, `total`).
   - Fatia 3: `SessaoRepository.findAbertaEm` (Optional, usado no voto), `SemSessaoAbertaException`, `VotoDuplicadoException`, `ResultadoIndisponivelException`. Os três mapeiam para 409 em `TratadorErros.conflito`.
 
 ## Stack e comandos
@@ -48,7 +48,9 @@
 - F3-ORDEM: `POST /pautas/{id}/votos` checa nesta ordem: body válido (400), pauta existe (404, com lock `PESSIMISTIC_WRITE`), sessão aberta (409), `associadoId` ainda sem voto na pauta (409).
 - F3-OPCAO: `opcao` é match exato, case-sensitive. `sim` minúsculo retorna 400.
 - F3-JANELA: sessão aberta em `inicio <= now < fim`. Voto em `now == fim` retorna 409.
-- F3-UNICO: constraint `UNIQUE (pauta_id, associado_id)` no banco. Violação em `saveAndFlush` vira `VotoDuplicadoException` (409). A checagem `existsBy...` antes do insert é só caminho rápido.
+- F3-UNICO: constraint `UNIQUE (pauta_id, associado_id)` no banco (nome `uk_voto_pauta_associado`, constante `Voto.RESTRICAO_UNICA`). Violação em `saveAndFlush` vira `VotoDuplicadoException` (409) só se a causa citar a constraint (`VotoService.violaRestricaoUnica`, percorre a cadeia de causas). Outras `DataIntegrityViolationException` propagam (500). A checagem `existsBy...` antes do insert é só caminho rápido.
+- D3c (fatia 3, correção do review): `associadoId` normalizado (strip + lowercase `Locale.ROOT`) antes de `existsBy` e da persistência. `"a1"`, `"a1 "` e `"A1"` são o mesmo associado. Política de caixa assumida; confirmar com dono do ticket.
+- F3-RESULTADO: `resultado` pega o mesmo lock `PESSIMISTIC_WRITE` de `registrar` (`findComLockPorId`) antes de contar, para não ler antes de um voto em voo commitar.
 - `open-in-view: false` em `application.yml`.
 
 ## Entregas
@@ -58,7 +60,8 @@
 - Fatia 2 (Sessão, `wt-orqaliz-implement-spec`): `POST /pautas/{id}/sessao` com `Clock` injetado, lock `PESSIMISTIC_WRITE` na pauta antes da checagem de sessão aberta, 404 para pauta inexistente (checada antes do lock), 409 para sessão aberta duplicada, 400 para duração inválida (D9) e acima do teto (1440).
 - Ciclo de correção do review da fatia 2: `SessaoControllerTest` reescrito com status asserts em todos os 400, teste de teto (1441 → 400, 1440 → 201), tipos JSON inválidos (`"abc"`, `true`, `[1]` → 400), `id` no corpo, `inicio` no caso `fim == agora`, e teste de concorrência com 2 threads contra H2 afirmando 1 × 201 e 1 × 409 com lock pessimista. Banco de teste isolado por `@TestPropertySource` (`jdbc:h2:mem:sessao`). Overload morto `abrirSessao(Long, String)` removido. `mvnd test`: 37 testes, verdes.
 - Fatia 3 (Votos, `cm/run_56fd0adf2ca1/orqaliz-implement-spec`): `POST /pautas/{id}/votos` e `GET /pautas/{id}/resultado`, constraint UNIQUE, ordem de checagem F3-ORDEM, janela F3-JANELA. `VotoControllerTest` com 14 testes cobrindo AC-3.1 a AC-3.8, borda `fim == now` (S-V1) e voto duplicado concorrente (S-V2, 1 × 201 e 1 × 409). `mvnd test`: 51 testes, verdes.
-- Fora da fatia 2: votos e resultado (Fatia 3, feito), `GET /pautas/{id}/sessoes` (C1, não implementado), início agendado, fechamento manual, estender ou reabrir sessão.
+- Fora da fatia 2: `GET /pautas/{id}/sessoes` (C1, não implementado), início agendado, fechamento manual, estender ou reabrir sessão. Votos e resultado são da fatia 3 (ver Entregas).
+- Ciclo de correção do review da fatia 3: constraint UNIQUE testada no `saveAndFlush` (409 com `Associado ja votou`), catch restrito à constraint, `associadoId` `""`/`"   "`/256 chars (400 citando campo), F3-ORDEM (400 antes de 404; sessão antes de duplicado), normalização `"a1 "`/`"A1"` → 409, `resultado` com lock e teste de voto em voo (`resultadoEsperaVotoEmVooAntesDeApurar`). `VotoServiceTest` cobre o reconhecimento da constraint. `mvnd test`: 59 testes, verdes.
 - Fora desta fatia (W1 a W4 da fatia 1): listagem, atualização, remoção, autenticação, persistência durável.
 
 ## Armadilhas
@@ -72,7 +75,8 @@
 - Teste de sessão usa `MutableClock` com `@Primary` em `@TestConfiguration` aninhada (detectada automaticamente; sem `@Import`). Clock é resetado no `@BeforeEach`.
 - Teste de concorrência (`abrirSessaoConcorrenteNaMesmaPautaUmCriaOutroRecebe409`) usa threads com MockMvc e transação real do service. Se a classe de teste ganhar `@Transactional`, o teste perde validade (falso positivo): as threads passam a compartilhar a transação de teste.
 - `VotoControllerTest` usa URL própria `jdbc:h2:mem:voto`. Mesma regra: sem `@Transactional` na classe, senão o teste de voto concorrente perde validade.
-- Voto: `DataIntegrityViolationException` do `saveAndFlush` é traduzida para 409. Só funciona porque o flush acontece dentro do `saveAndFlush`. Não trocar por `save` sem flush.
+- Voto: `DataIntegrityViolationException` do `saveAndFlush` é traduzida para 409 só quando a causa cita `uk_voto_pauta_associado`. Só funciona porque o flush acontece dentro do `saveAndFlush`. Não trocar por `save` sem flush.
+- Teste de voto em voo (`resultadoEsperaVotoEmVooAntesDeApurar`): `MutableClock.pausarAoLerAgora` pausa a thread nomeada dentro de `instant()`, com o lock e a transação do voto abertos. Não remover o nome de thread nem o `retomar()` do `@BeforeEach`.
 
 ## Pendências
 
@@ -101,3 +105,10 @@
 - Fatia 3: índice ausente para `findByPautaId` e `countByPautaIdAndOpcao`. `uk_voto_pauta_associado` já cobre `pauta_id` como prefixo. Revisar para `(pauta_id, opcao)` se o resultado ficar lento.
 - Fatia 3, ordem 404 de voto antes do lock: coberta indiretamente por `votoEmPautaInexistenteRetorna404FormatoPadrao`, sem teste de ordem explícito.
 - Fatia 3: validação de `associadoId` contra cadastro externo (W2 do master) fora do escopo.
+- Fatia 3, MIGRATION AUSENTE: não há Flyway nem Liquibase no pom. Tabela `voto` vem de `ddl-auto: create-drop` (Hibernate). Antes de produção, criar migration com `voto`, FKs e `uk_voto_pauta_associado`, e índice `(pauta_id, opcao)`.
+- Fatia 3, RISCO D3 SEM DONO: `associadoId` no body, sem autenticação, sem limite de volume. Dono do risco: NÃO DEFINIDO. Prazo: NÃO DEFINIDO. Registrar na descrição do PR (autenticação, volume, oráculo de estado 404/409) antes de mergear. Não mergear sem dono nomeado.
+- Fatia 3, oráculo de estado: 404 vs 409 (sessão fechada, aberta, duplicado) e `GET /resultado` 409 vs 200 revelam existência e estado de pautas. Severidade baixa.
+- Fatia 3, lock timeout ausente: `PESSIMISTIC_WRITE` sem `jakarta.persistence.lock.timeout`. Fila de voto segura conexão do Hikari (pool 10). Definir timeout e validar com pool pequeno.
+- Fatia 3, índice `(pauta_id, opcao)` ainda ausente: `resultado` faz 3 queries (`existsById` + 2 `countByPautaIdAndOpcao`). Consolidar em `GROUP BY opcao` ou criar índice.
+- Fatia 3, `resultado` sem sessão nunca aberta retorna 200 zerado. Não especificado em D4 e sem teste de aceite. Confirmar com dono da spec.
+- Fatia 3: `associadoId` normalizado (D3c) altera o que é gravado: `"A1"` vira `"a1"`. Confirmar a política de caixa com dono do ticket.

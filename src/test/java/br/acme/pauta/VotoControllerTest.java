@@ -51,6 +51,9 @@ class VotoControllerTest {
 
     static final class MutableClock extends Clock {
         private final AtomicReference<Instant> agora;
+        private volatile String threadPausada;
+        private volatile CountDownLatch chegou;
+        private volatile CountDownLatch liberar;
 
         MutableClock(Instant inicial) {
             this.agora = new AtomicReference<>(inicial);
@@ -58,6 +61,16 @@ class VotoControllerTest {
 
         void avancarPara(Instant instante) {
             agora.set(instante);
+        }
+
+        void pausarAoLerAgora(String nomeDaThread, CountDownLatch chegou, CountDownLatch liberar) {
+            this.chegou = chegou;
+            this.liberar = liberar;
+            this.threadPausada = nomeDaThread;
+        }
+
+        void retomar() {
+            threadPausada = null;
         }
 
         @Override
@@ -72,7 +85,16 @@ class VotoControllerTest {
 
         @Override
         public Instant instant() {
-            return agora.get();
+            Instant valor = agora.get();
+            if (Thread.currentThread().getName().equals(threadPausada)) {
+                chegou.countDown();
+                try {
+                    liberar.await(30, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            return valor;
         }
     }
 
@@ -87,6 +109,7 @@ class VotoControllerTest {
 
     @BeforeEach
     void relogioNoInicio() {
+        relogio.retomar();
         relogio.avancarPara(T0);
     }
 
@@ -231,6 +254,39 @@ class VotoControllerTest {
     }
 
     @Test
+    void resultadoEsperaVotoEmVooAntesDeApurar() throws Exception {
+        long pautaId = criarPauta("Voto em voo");
+        abrirSessao(pautaId, "{\"duracaoMinutos\": 5}").andExpect(status().isCreated());
+
+        CountDownLatch votoLeuAgora = new CountDownLatch(1);
+        CountDownLatch liberarCommit = new CountDownLatch(1);
+        relogio.pausarAoLerAgora("voto-em-voo", votoLeuAgora, liberarCommit);
+        ExecutorService votante = Executors.newSingleThreadExecutor(r -> new Thread(r, "voto-em-voo"));
+        ExecutorService consulta = Executors.newSingleThreadExecutor();
+        try {
+            Future<Integer> voto = votante.submit(() ->
+                    votar(pautaId, "{\"associadoId\": \"a1\", \"opcao\": \"SIM\"}")
+                            .andReturn().getResponse().getStatus());
+            assertThat(votoLeuAgora.await(30, TimeUnit.SECONDS)).isTrue();
+
+            relogio.avancarPara(T0.plusSeconds(300));
+            Future<String> leitura = consulta.submit(() ->
+                    resultado(pautaId).andReturn().getResponse().getContentAsString());
+            Thread.sleep(300);
+            assertThat(leitura.isDone()).as("resultado deve esperar o voto em voo").isFalse();
+
+            liberarCommit.countDown();
+            assertThat(voto.get(30, TimeUnit.SECONDS)).isEqualTo(201);
+            assertThat(leitura.get(30, TimeUnit.SECONDS)).contains("\"sim\":1").contains("\"total\":1");
+        } finally {
+            relogio.retomar();
+            liberarCommit.countDown();
+            votante.shutdownNow();
+            consulta.shutdownNow();
+        }
+    }
+
+    @Test
     void resultadoAposEncerramentoApuraSimENaoETotal() throws Exception {
         long pautaId = criarPauta("Apuracao");
         abrirSessao(pautaId, "{\"duracaoMinutos\": 5}").andExpect(status().isCreated());
@@ -277,6 +333,68 @@ class VotoControllerTest {
         resultado(999999L)
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("NOT_FOUND"));
+    }
+
+    @Test
+    void associadoIdVazioOuEmBrancoRetorna400CitandoCampo() throws Exception {
+        long pautaId = criarPauta("Associado vazio");
+        abrirSessao(pautaId, "{\"duracaoMinutos\": 5}").andExpect(status().isCreated());
+
+        for (String associado : List.of("", "   ")) {
+            votar(pautaId, "{\"associadoId\": \"" + associado + "\", \"opcao\": \"SIM\"}")
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"))
+                    .andExpect(jsonPath("$.message").value(containsString("associadoId")));
+        }
+        assertThat(votos.findByPautaId(pautaId)).isEmpty();
+    }
+
+    @Test
+    void associadoIdComDuzentosECincoentaESeisCaracteresRetorna400CitandoCampo() throws Exception {
+        long pautaId = criarPauta("Associado longo");
+        abrirSessao(pautaId, "{\"duracaoMinutos\": 5}").andExpect(status().isCreated());
+
+        votar(pautaId, "{\"associadoId\": \"" + "a".repeat(256) + "\", \"opcao\": \"SIM\"}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").value(containsString("associadoId")));
+        assertThat(votos.findByPautaId(pautaId)).isEmpty();
+    }
+
+    @Test
+    void bodyInvalidoEmPautaInexistenteRetorna400AntesDe404() throws Exception {
+        votar(999999L, "{\"associadoId\": \"\", \"opcao\": \"SIM\"}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void associadoJaVotadoEmPautaSemSessaoRetornaErroDeSessaoAntesDeDuplicado() throws Exception {
+        long pautaId = criarPauta("Ordem sessao");
+        abrirSessao(pautaId, "{\"duracaoMinutos\": 1}").andExpect(status().isCreated());
+        votar(pautaId, "{\"associadoId\": \"a1\", \"opcao\": \"SIM\"}").andExpect(status().isCreated());
+
+        relogio.avancarPara(T0.plusSeconds(60));
+        votar(pautaId, "{\"associadoId\": \"a1\", \"opcao\": \"SIM\"}")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value(containsString("sem sessao aberta")));
+    }
+
+    @Test
+    void associadoIdComEspacoOuCaixaDiferenteNaoVotaDeNovo() throws Exception {
+        long pautaId = criarPauta("Normalizacao");
+        abrirSessao(pautaId, "{\"duracaoMinutos\": 5}").andExpect(status().isCreated());
+
+        votar(pautaId, "{\"associadoId\": \"a1\", \"opcao\": \"SIM\"}").andExpect(status().isCreated());
+        votar(pautaId, "{\"associadoId\": \"a1 \", \"opcao\": \"NAO\"}")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("CONFLICT"));
+        votar(pautaId, "{\"associadoId\": \"A1\", \"opcao\": \"NAO\"}")
+                .andExpect(status().isConflict());
+
+        assertThat(votos.findByPautaId(pautaId))
+                .singleElement()
+                .satisfies(voto -> assertThat(voto.getAssociadoId()).isEqualTo("a1"));
     }
 
     private long criarPauta(String titulo) throws Exception {
