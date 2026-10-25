@@ -1,5 +1,6 @@
 package br.coop.associados.votacao.pauta;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
@@ -11,8 +12,10 @@ public class Pauta {
     @GeneratedValue
     private Long id;
 
+    @Column(nullable = false, length = PautaRequest.TITULO_MAX)
     private String titulo;
 
+    @Column(length = PautaRequest.DESCRICAO_MAX)
     private String descricao;
 
     protected Pauta() {

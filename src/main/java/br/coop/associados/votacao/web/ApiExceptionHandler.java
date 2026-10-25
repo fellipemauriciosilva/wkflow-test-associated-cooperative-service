@@ -6,9 +6,11 @@ import java.time.Instant;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -26,7 +28,17 @@ public class ApiExceptionHandler {
         return erro(HttpStatus.BAD_REQUEST, campos, request);
     }
 
-    private ResponseEntity<ErroResponse> erro(HttpStatus status, String message, HttpServletRequest request) {
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErroResponse> corpoInvalido(HttpMessageNotReadableException ex, HttpServletRequest request) {
+        return erro(HttpStatus.BAD_REQUEST, "Corpo da requisição inválido", request);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErroResponse> parametroInvalido(MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+        return erro(HttpStatus.BAD_REQUEST, "Parâmetro 'id' inválido", request);
+    }
+
+    public static ResponseEntity<ErroResponse> erro(HttpStatus status, String message, HttpServletRequest request) {
         ErroResponse body = new ErroResponse(
                 Instant.now(),
                 status.value(),
