@@ -1,14 +1,16 @@
 package br.acme.pauta;
 
+import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.Locale;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class VotoService {
+
+    private static final String SQLSTATE_UNIQUE_VIOLATION = "23505";
 
     private final PautaRepository pautas;
     private final SessaoRepository sessoes;
@@ -57,8 +59,7 @@ public class VotoService {
 
     static boolean violaRestricaoUnica(Throwable erro) {
         for (Throwable atual = erro; atual != null; atual = atual.getCause()) {
-            String mensagem = atual.getMessage();
-            if (mensagem != null && mensagem.toLowerCase(Locale.ROOT).contains(Voto.RESTRICAO_UNICA)) {
+            if (atual instanceof SQLException sql && SQLSTATE_UNIQUE_VIOLATION.equals(sql.getSQLState())) {
                 return true;
             }
         }
