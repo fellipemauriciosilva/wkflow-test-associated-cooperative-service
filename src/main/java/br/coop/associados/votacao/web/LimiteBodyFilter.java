@@ -8,7 +8,11 @@ import jakarta.servlet.ServletInputStream;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -53,6 +57,7 @@ public class LimiteBodyFilter extends OncePerRequestFilter {
     static final class RequestComLimite extends HttpServletRequestWrapper {
 
         private final long limite;
+        private EntradaComLimite entrada;
 
         RequestComLimite(HttpServletRequest request, long limite) {
             super(request);
@@ -61,7 +66,24 @@ public class LimiteBodyFilter extends OncePerRequestFilter {
 
         @Override
         public ServletInputStream getInputStream() throws IOException {
-            return new EntradaComLimite(super.getInputStream(), limite);
+            return entrada();
+        }
+
+        @Override
+        public BufferedReader getReader() throws IOException {
+            return new BufferedReader(new InputStreamReader(entrada(), charset()));
+        }
+
+        private EntradaComLimite entrada() throws IOException {
+            if (entrada == null) {
+                entrada = new EntradaComLimite(super.getInputStream(), limite);
+            }
+            return entrada;
+        }
+
+        private Charset charset() {
+            String codificacao = getCharacterEncoding();
+            return codificacao == null ? StandardCharsets.UTF_8 : Charset.forName(codificacao);
         }
     }
 

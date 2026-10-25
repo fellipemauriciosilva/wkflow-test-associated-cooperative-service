@@ -190,18 +190,6 @@ class PautaControllerTest {
     }
 
     @Test
-    void corpoChunkedAcimaDoLimiteRetorna413SemContentLength() throws Exception {
-        String grande = "{\"titulo\":\"x\",\"descricao\":\"" + "d".repeat(20 * 1024) + "\"}";
-        mvc.perform(post("/pautas")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(grande))
-                .andExpect(status().isPayloadTooLarge())
-                .andExpect(jsonPath("$.status").value(413))
-                .andExpect(jsonPath("$.message").value(LimiteBodyFilter.MENSAGEM_LIMITE))
-                .andExpect(jsonPath("$.path").value("/pautas"));
-    }
-
-    @Test
     void corpoChunkedDentroDoLimiteEhAceito() throws Exception {
         mvc.perform(post("/pautas")
                         .contentType(MediaType.APPLICATION_JSON)

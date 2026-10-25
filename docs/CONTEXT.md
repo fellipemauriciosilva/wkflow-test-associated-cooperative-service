@@ -23,7 +23,7 @@
 - `titulo`: obrigatório, em branco não é aceito, máximo 255 caracteres (`PautaRequest.TITULO_MAX`).
 - `descricao`: opcional, ausente ou `null` é aceita e devolvida como `null`, máximo 1000 caracteres (`PautaRequest.DESCRICAO_MAX`).
 - Acima do limite de campo: 400 com `message` listando o campo (`titulo: ...`, `descricao: ...`).
-- Limite do body: 16 KB (`LimiteBodyFilter.TAMANHO_MAXIMO_BYTES`). Checado por `Content-Length` e, sem o header (chunked), pela contagem de bytes lidos no wrapper de `InputStream`. Acima disso: 413 com `ErroResponse` escrito direto pelo filtro (`message` `LimiteBodyFilter.MENSAGEM_LIMITE`).
+- Limite do body: 16 KB (`LimiteBodyFilter.TAMANHO_MAXIMO_BYTES`). Com `Content-Length` acima do limite, o filtro responde 413 com `ErroResponse` direto. Sem o header (chunked), `getInputStream()` e `getReader()` contam bytes lidos; ao estourar, `LimiteExcedidoException` vira 413 pelo `ApiExceptionHandler` (`message` `LimiteBodyFilter.MENSAGEM_LIMITE`). Coberto por `LimiteBodyChunkedTest` (RANDOM_PORT, chunked real) e `LimiteBodyFilterTest`.
 - JSON malformado: 400, `message` fixa `Corpo da requisição inválido`.
 - `id` não numérico em `GET /pautas/{id}`: 400, `message` fixa `Parâmetro 'id' inválido`.
 - Pauta inexistente: 404, `message` `Pauta não encontrada: {id}`.
