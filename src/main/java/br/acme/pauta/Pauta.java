@@ -9,13 +9,16 @@ import jakarta.persistence.Id;
 @Entity
 public class Pauta {
 
+    static final int TAMANHO_MAXIMO = 255;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = TAMANHO_MAXIMO)
     private String titulo;
 
+    @Column(length = TAMANHO_MAXIMO)
     private String descricao;
 
     protected Pauta() {
