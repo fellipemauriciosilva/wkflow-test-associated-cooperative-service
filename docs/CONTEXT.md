@@ -37,7 +37,7 @@
 - D6b: limite de tamanho N = 255 para `titulo` e `descricao`, medido em unidades UTF-16 (`String.length()`; emoji ocupa 2). `@Size` em `PautaRequest` e `@Column(length)` em `Pauta` usam a mesma constante `Pauta.TAMANHO_MAXIMO`.
 - D7: 5xx nunca expõe mensagem da exceção. Body genérico `Erro interno do servidor`, stack logada com `log.error`. Vale para `ErrorResponse` 5xx e exceções genéricas.
 - D8: sessão aberta é `inicio <= agora < fim` (fim exclusivo). Sessão com `fim == agora` não conta como aberta. Pendente de confirmação na spec mestre.
-- D9: `duracaoMinutos` ausente ou `null` vale 1 minuto. Valor não inteiro (ex.: `1.5`) ou `<= 0` retorna 400 citando o campo `duracaoMinutos`. Teto: `> 1440` retorna 400 citando o campo (teto de 24 h, escolha da fatia; evita sessão que bloqueia a pauta por séculos). Strings numéricas (`"5"`) são aceitas por coerção do Jackson em `BigDecimal`. Strings não numéricas, booleanos e arrays caem em `HttpMessageNotReadableException` e saem como `corpo: JSON invalido` (não cita o campo). Pendente de confirmação; não está na spec mestre.
+- D9: `duracaoMinutos` ausente ou `null` vale 1 minuto. Valor não inteiro (ex.: `1.5`) ou `<= 0` retorna 400 citando o campo `duracaoMinutos`. Teto: `> 1440` retorna 400 citando o campo (teto de 24 h, escolha da fatia; evita sessão que bloqueia a pauta por séculos). Strings numéricas (`"5"`) são aceitas por coerção do Jackson em `BigDecimal`. Regra única para tipo JSON errado (strings não numéricas, booleanos, arrays): 400 com `message` exata `corpo: JSON invalido`, sem citar o campo; vale para qualquer corpo com tipo inválido (`HttpMessageNotReadableException`). Contrato explícito, travado por `abrirSessaoComTipoJsonInvalidoEmDuracaoRetorna400`. Pendente de confirmação; não está na spec mestre.
 - D10: corpo do 201 de sessão: `id`, `pautaId`, `inicio`, `fim`, `duracaoMinutos`. Pendente de confirmação; não está na spec mestre.
 - `open-in-view: false` em `application.yml`.
 
@@ -67,8 +67,9 @@
 - Confirmar D6 (campos da pauta) com dono do ticket. Se houver outros campos obrigatórios, ajustar `PautaRequest` e testes antes do merge.
 - Confirmar D2a (códigos de `error`) antes da fatia 3, pois viram contrato. Framework 400s não mapeados (ex.: parâmetro ausente) saem como `BAD_REQUEST`, não `VALIDATION_ERROR`.
 - Confirmar D8, D9 (incluindo teto 1440) e D10 com dono do ticket (extensão fora da spec mestre).
-- Mensagem de tipo JSON inválido em `duracaoMinutos` não cita o campo (`corpo: JSON invalido`). D9 pede citar o campo. Decidir se o handler de `HttpMessageNotReadableException` deve nomear o campo ou se o contrato aceita a mensagem genérica.
-- Risco aceito, a registrar com dono e prazo: abrir sessão sem autenticação nem autorização (fora da fatia). Com o teto, o dano máximo por requisição é uma pauta bloqueada por até 24 h, mas qualquer cliente pode repetir o POST.
+- Tipo JSON inválido em `duracaoMinutos` sai como `corpo: JSON invalido`, sem citar o campo (D9). Contrato adotado; confirmar com dono do ticket. Se o dono exigir citar o campo, extrair o nome de `JsonMappingException.getPath()` no handler e reescrever D9 e o teste.
+- RISCO ABERTO, SEM ACEITE: abrir sessão sem autenticação nem autorização (fora da fatia). Com o teto, o dano máximo por requisição é uma pauta bloqueada por até 24 h, mas qualquer cliente pode repetir o POST ao fim da sessão. Dono do risco e prazo: NÃO DEFINIDOS. Antes do merge, o dono da spec precisa registrar aceite com nome e prazo, ou exigir autenticação/rate limit.
+- Teste de concorrência não tem prova de mutação: não foi rodado sem `PESSIMISTIC_WRITE` para confirmar que falha. Pendente.
 - Índice ausente para o caminho quente: `countAbertasEm` filtra por `pauta_id`, `inicio` e `fim`. Sugerir índice `(pauta_id, inicio, fim)` na migração quando houver migração (em Postgres a FK não cria índice).
 - `id` 409 expõe o id interno na mensagem (`Pauta ja possui sessao aberta: <id>`). Baixo risco; confirmar junto com D2a.
 - `descricao` só com espaços vira null (D6). Confirmar com dono do ticket.

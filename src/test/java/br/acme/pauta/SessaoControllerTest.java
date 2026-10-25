@@ -237,7 +237,7 @@ class SessaoControllerTest {
         abrirSessao(pautaId, "{\"duracaoMinutos\": 1441}")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.message").value(containsString("duracaoMinutos")));
+                .andExpect(jsonPath("$.message").value("duracaoMinutos: deve ser no maximo 1440"));
     }
 
     @Test
