@@ -47,8 +47,10 @@
 
 ## Pendências
 
+- MERGE CONDICIONADO: não fazer merge até o dono do ticket confirmar D6 e D2a (incluindo 405, 415 e 500 novos). Confirmação não existe no código; registrar aqui quando ocorrer.
 - Confirmar D6 (campos da pauta) com dono do ticket. Se houver outros campos obrigatórios, ajustar `PautaRequest` e testes antes do merge.
-- Confirmar D2a (códigos de `error`) antes de iniciar fatia 2, pois viram contrato.
+- Confirmar D2a (códigos de `error`) antes de iniciar fatia 2, pois viram contrato. Framework 400s não mapeados (ex.: parâmetro ausente) saem como `BAD_REQUEST`, não `VALIDATION_ERROR`.
+- `descricao` só com espaços vira null (D6). Confirmar com dono do ticket.
 - Limite de body JSON (request) não aplicado na app. Fazer no gateway/proxy (ex.: `client_max_body_size`).
 - Perfil de persistência: H2 em memória é o default único. Mover para profile `dev`/`test` e exigir datasource fora dele.
 - Múltiplos erros de campo: `TratadorErros` mostra só o primeiro. Decidir se é contrato.

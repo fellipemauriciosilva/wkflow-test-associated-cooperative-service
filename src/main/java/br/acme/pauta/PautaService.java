@@ -14,7 +14,7 @@ public class PautaService {
 
     @Transactional
     public PautaResponse criar(PautaRequest request) {
-        Pauta pauta = repository.save(new Pauta(request.titulo().strip(), aparar(request.descricao())));
+        Pauta pauta = repository.save(new Pauta(request.titulo(), request.descricao()));
         return PautaResponse.de(pauta);
     }
 
@@ -23,9 +23,5 @@ public class PautaService {
         return repository.findById(id)
                 .map(PautaResponse::de)
                 .orElseThrow(() -> new PautaNaoEncontradaException(id));
-    }
-
-    private static String aparar(String texto) {
-        return texto == null ? null : texto.strip();
     }
 }

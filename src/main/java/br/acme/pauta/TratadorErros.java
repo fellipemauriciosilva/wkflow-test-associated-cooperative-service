@@ -54,7 +54,7 @@ public class TratadorErros {
 
     @ExceptionHandler(Exception.class)
     ResponseEntity<ErroPadrao> inesperado(Exception ex, HttpServletRequest request) {
-        if (ex instanceof ErrorResponse resposta) {
+        if (ex instanceof ErrorResponse resposta && !resposta.getStatusCode().is5xxServerError()) {
             HttpStatus status = HttpStatus.valueOf(resposta.getStatusCode().value());
             return responde(status, status.name(), ex.getMessage(), request);
         }

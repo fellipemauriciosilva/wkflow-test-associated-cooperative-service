@@ -173,6 +173,25 @@ class PautaControllerTest {
     }
 
     @Test
+    void criarPautaComTituloNoLimiteComEspacosNasBordas_retorna201ComTamanhoAparado() throws Exception {
+        String titulo = "a".repeat(Pauta.TAMANHO_MAXIMO);
+        mvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(corpo("  " + titulo + "  ", "ok")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.titulo").value(titulo));
+    }
+
+    @Test
+    void criarPautaComDescricaoSoEspacos_persisteSemDescricao() throws Exception {
+        mvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(corpo("Titulo", "   ")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.descricao").doesNotExist());
+    }
+
+    @Test
     void corpoJsonMalformado_retorna400FormatoPadrao() throws Exception {
         mvc.perform(post("/pautas")
                         .contentType(MediaType.APPLICATION_JSON)
