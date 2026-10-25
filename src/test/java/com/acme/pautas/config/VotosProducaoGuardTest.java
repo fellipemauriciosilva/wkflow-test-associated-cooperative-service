@@ -10,23 +10,48 @@ class VotosProducaoGuardTest {
 
     @Test
     void recusaVotosHabilitadosNoPerfilProd() {
-        MockEnvironment ambiente = new MockEnvironment().withProperty("spring.profiles.active", "prod");
+        assertRecusa(ambienteCom("prod"), true);
+    }
 
-        assertThrows(IllegalStateException.class,
-                () -> new VotosProducaoGuard(ambiente, true).afterPropertiesSet());
+    @Test
+    void recusaVotosHabilitadosNoPerfilProduction() {
+        assertRecusa(ambienteCom("production"), true);
+    }
+
+    @Test
+    void recusaVotosHabilitadosQuandoAlgumPerfilNaoEhPermitido() {
+        assertRecusa(ambienteCom("test", "prod"), true);
+    }
+
+    @Test
+    void recusaVotosHabilitadosSemPerfilAtivo() {
+        assertRecusa(new MockEnvironment(), true);
     }
 
     @Test
     void aceitaVotosDesabilitadosNoPerfilProd() {
-        MockEnvironment ambiente = new MockEnvironment().withProperty("spring.profiles.active", "prod");
-
-        assertDoesNotThrow(() -> new VotosProducaoGuard(ambiente, false).afterPropertiesSet());
+        assertDoesNotThrow(() -> new VotosProducaoGuard(ambienteCom("prod"), false).afterPropertiesSet());
     }
 
     @Test
-    void aceitaVotosHabilitadosForaDeProd() {
-        MockEnvironment ambiente = new MockEnvironment();
+    void aceitaVotosDesabilitadosSemPerfilAtivo() {
+        assertDoesNotThrow(() -> new VotosProducaoGuard(new MockEnvironment(), false).afterPropertiesSet());
+    }
 
-        assertDoesNotThrow(() -> new VotosProducaoGuard(ambiente, true).afterPropertiesSet());
+    @Test
+    void aceitaVotosHabilitadosNosPerfisPermitidos() {
+        for (String perfil : new String[]{"dev", "test", "local"}) {
+            assertDoesNotThrow(() -> new VotosProducaoGuard(ambienteCom(perfil), true).afterPropertiesSet(),
+                    perfil);
+        }
+    }
+
+    private static void assertRecusa(MockEnvironment ambiente, boolean habilitado) {
+        assertThrows(IllegalStateException.class,
+                () -> new VotosProducaoGuard(ambiente, habilitado).afterPropertiesSet());
+    }
+
+    private static MockEnvironment ambienteCom(String... perfis) {
+        return new MockEnvironment().withProperty("spring.profiles.active", String.join(",", perfis));
     }
 }

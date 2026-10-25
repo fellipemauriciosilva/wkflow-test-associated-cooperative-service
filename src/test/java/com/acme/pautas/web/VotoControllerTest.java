@@ -17,6 +17,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -33,6 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = "pautas.votos.habilitado=true")
+@ActiveProfiles("test")
 @AutoConfigureMockMvc
 @Import(RelogioDeTeste.class)
 class VotoControllerTest {
@@ -331,6 +333,29 @@ class VotoControllerTest {
 
     private static String corpoComAssociado(String associadoId) {
         return "{\"associadoId\": \"" + associadoId + "\", \"voto\": \"SIM\"}";
+    }
+
+    @Test
+    void associadoIdDe255CaracteresComEspacosNasPontasEhAceito() throws Exception {
+        Long pautaId = pautaComSessao("Pauta limite 255", 5);
+        String associado = "   " + "a".repeat(255) + "   ";
+
+        mvc.perform(votar(pautaId, "{\"associadoId\": \"" + associado + "\", \"voto\": \"SIM\"}"))
+                .andExpect(status().isCreated());
+
+        assertEquals(1, votos.countByPautaId(pautaId));
+    }
+
+    @Test
+    void associadoIdDe256CaracteresComEspacosNasPontasEhRejeitado() throws Exception {
+        Long pautaId = pautaComSessao("Pauta limite 256", 5);
+        String associado = "  " + "b".repeat(256) + "  ";
+
+        mvc.perform(votar(pautaId, "{\"associadoId\": \"" + associado + "\", \"voto\": \"SIM\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.erro").value("VALIDACAO_INVALIDA"));
+
+        assertEquals(0, votos.countByPautaId(pautaId));
     }
 
     private org.springframework.test.web.servlet.RequestBuilder votar(Long pautaId, String corpo) {

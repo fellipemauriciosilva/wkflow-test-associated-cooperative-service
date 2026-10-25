@@ -17,7 +17,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(properties = "pautas.votos.habilitado=false")
 @AutoConfigureMockMvc
 @Import(RelogioDeTeste.class)
 class VotosDesabilitadosTest {
