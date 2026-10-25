@@ -28,7 +28,7 @@ public class VotoService {
 
     @Transactional
     public Voto registrar(Long pautaId, String associadoId, OpcaoVoto opcao) {
-        pautas.findById(pautaId).orElseThrow(() -> new PautaNaoEncontradaException(pautaId));
+        pautas.findWithLockById(pautaId).orElseThrow(() -> new PautaNaoEncontradaException(pautaId));
         if (!sessoes.existsByPautaIdAndFimAfter(pautaId, Instant.now(clock))) {
             throw new SemSessaoAbertaException(pautaId);
         }
