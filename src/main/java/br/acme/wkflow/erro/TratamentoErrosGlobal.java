@@ -2,6 +2,9 @@ package br.acme.wkflow.erro;
 
 import br.acme.wkflow.pauta.PautaNaoEncontradaException;
 import br.acme.wkflow.sessao.SessaoJaAbertaException;
+import br.acme.wkflow.voto.SessaoNaoAbertaException;
+import br.acme.wkflow.voto.ValorVotoInvalidoException;
+import br.acme.wkflow.voto.VotoDuplicadoException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -30,6 +33,21 @@ public class TratamentoErrosGlobal {
     @ExceptionHandler(SessaoJaAbertaException.class)
     public ProblemDetail sessaoJaAberta(SessaoJaAbertaException ex) {
         return problema(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler(SessaoNaoAbertaException.class)
+    public ProblemDetail sessaoNaoAberta(SessaoNaoAbertaException ex) {
+        return problema(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler(VotoDuplicadoException.class)
+    public ProblemDetail votoDuplicado(VotoDuplicadoException ex) {
+        return problema(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler(ValorVotoInvalidoException.class)
+    public ProblemDetail valorVotoInvalido(ValorVotoInvalidoException ex) {
+        return problema(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
