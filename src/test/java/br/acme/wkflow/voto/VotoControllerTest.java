@@ -333,6 +333,17 @@ class VotoControllerTest {
     }
 
     @Test
+    void associadoIdDe10000CaracteresRetorna400SemStackOverflow() throws Exception {
+        mvc.perform(post("/pautas/{id}/votos", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(votoJson("a".repeat(10_000), "SIM")))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
+
+        assertEquals(0L, votos.findAll().stream().filter(v -> pautaId.equals(v.getPautaId())).count());
+    }
+
+    @Test
     void associadoIdAcimaDe255CaracteresRetorna400() throws Exception {
         mvc.perform(post("/pautas/{id}/votos", pautaId)
                         .contentType(MediaType.APPLICATION_JSON)
