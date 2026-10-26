@@ -17,7 +17,7 @@
 
 ## Convenções
 
-- Testes de controller com `@SpringBootTest` + `@AutoConfigureMockMvc`, nomeados por critério de aceite (`ac11_...` a `ac15_...` na pauta, `ac21_...` a `ac25_...` na sessão).
+- Testes de controller com `@SpringBootTest` + `@AutoConfigureMockMvc`, nomeados por critério de aceite (`ac11_...` a `ac15_...` na pauta, `ac21_...` a `ac26_...` na sessão; `ac26` = tipo inválido da duração).
 - Erros de API sempre `application/problem+json` via `ProblemDetail`. `spring.mvc.problemdetails.enabled=true` cobre erros do framework (404, 405, 415, type mismatch).
 - Pacote por feature (`pauta`, `sessao`), tratamento de erro global em `erro`, infraestrutura de tempo em `tempo`.
 
@@ -32,7 +32,8 @@
 - Entidade `Pauta` com construtor `protected` para JPA e construtor público para o domínio.
 - `POST /pautas/{id}/sessao` retorna 201 com body `{"pautaId", "inicio", "fim"}` (formato assumido, ticket não define). Sem header `Location`.
 - `inicio` = `Instant.now(clock)`; `fim` = `inicio + duracaoMinutos`. Duração ausente ou `null` = 1 minuto.
-- Duração validada com `@Min(1)` no `SessaoRequest` (0 e negativos retornam 400). Tipo não inteiro retorna 400 via desserialização.
+- Duração validada com `@Min(1)` no `SessaoRequest` (0 e negativos retornam 400).
+- Coerção Jackson desligada para inteiros em `br.acme.wkflow.json.ConfiguracaoJson`: `5.5` (ACCEPT_FLOAT_AS_INT off) e `"5"` (String para Integer = Fail) retornam 400. `"abc"` também 400.
 - Pauta inexistente no POST de sessão retorna 404 via `existsById` antes de criar a sessão.
 - Sem autenticação, sem listagem, sem limite superior de duração (ticket não define teto).
 - `Sessao` é entidade JPA (persistência assumida, ticket não define).
@@ -40,7 +41,7 @@
 ## Entregas
 
 - Fatia 1/3 (cadastro e consulta de pauta): `POST /pautas`, `GET /pautas/{id}`, erros 400, 404, 415 e 500 em ProblemDetail. Testes AC-1.1 a AC-1.5 em `PautaControllerTest`, mais casos de erro de framework (GET id não numérico, Content-Type errado, descrição de 256 caracteres).
-- Fatia 2/3 (abertura de sessão por pauta): `POST /pautas/{id}/sessao` com duração padrão 1 min, validação `>= 1`, 404 para pauta inexistente, bean `Clock`. Testes AC-2.1 a AC-2.5 em `SessaoControllerTest` (`Clock` fixo), mais caso de duração não inteira. Reabertura de sessão NÃO implementada (gap bloqueante, ver Pendências).
+- Fatia 2/3 (abertura de sessão por pauta): `POST /pautas/{id}/sessao` com duração padrão 1 min, validação `>= 1`, 404 para pauta inexistente, bean `Clock`. Testes AC-2.1 a AC-2.5 em `SessaoControllerTest` (`Clock` fixo), mais casos de duração não inteira (`"abc"`, `5.5`, `"5"`), `duracaoMinutos: null` explícito e asserção de persistência por `pautaId` no AC-2.1. Reabertura de sessão NÃO implementada (Won't desta fatia, gap bloqueante, ver Pendências).
 
 ## Armadilhas
 
@@ -52,13 +53,18 @@
 - `Location` montado com path relativo (`/pautas/{id}`). Pode quebrar atrás de proxy com context path. Ver pendências.
 - Sem request body cap no código. Limitar no proxy/gateway. `max-http-form-post-size` não cobre body JSON.
 - `@RequestBody(required = false)` no POST de sessão: body ausente cai no padrão de 1 min. `Content-Type` errado continua 415.
-- Segunda abertura de sessão para a mesma pauta cria outra linha sem checar a anterior. Comportamento de reabertura (substituir, estender ou 409) pendente.
+- Segunda abertura de sessão para a mesma pauta cria outra linha sem checar a anterior (sem teste, por ser Won't). Comportamento de reabertura (substituir, estender ou 409) pendente.
+- Pauta removida entre `existsById` e `save` cria sessão órfã. Sem remoção de pauta hoje; aceito.
+- `Instant` no JSON depende de Jackson não escrever timestamp numérico (`write-dates-as-timestamps` default off). `ac22`/`ac23` quebram se mudar.
 
 ## Pendências
 
 - Confirmar com o ticket: `@Valid` (S1), Spring Data JPA e formato do body do GET e do 201 de sessão (assumidos).
 - Gap 5: campos da pauta além de `descricao` não definidos. Só `descricao` implementado.
-- Gap bloqueante (fatia 2): reabrir sessão já aberta. Substituir, estender ou rejeitar com 409 (assumido no master, W4 em aberto). Não implementado; sem teste para o caso.
+- Gap bloqueante (fatia 2): reabrir sessão já aberta. Substituir, estender ou rejeitar com 409 (assumido no master, W4 em aberto). Não implementado; sem teste para o caso. Quando decidido, proteger com lock pessimista na pauta ou índice único parcial, com teste de concorrência.
+- Ordem de validação: `@Valid` roda antes de `existsById`. Pauta inexistente + duração inválida retorna 400, não 404. Confirmar ordem.
+- Teto superior de duração: sem `@Max`. Definir antes da fatia 3.
+- `Sessao.pautaId` sem índice nem FK. Reabertura por `pautaId` vira full scan; adicionar índice junto com a regra de reabertura.
 - Confirmar: duração `null` explícita como padrão (assumido); teto superior de duração (não definido).
 - Fatia 3 (votos) depende de `Sessao` e do comportamento de reabertura.
 - Fora de escopo nesta correção (não implementado): normalizar espaços de `descricao` com `strip()` no DTO; `ServletUriComponentsBuilder` para `Location`; `spring.jpa.open-in-view=false`; varredura de dependências (SCA) contra o proxy interno antes do merge.

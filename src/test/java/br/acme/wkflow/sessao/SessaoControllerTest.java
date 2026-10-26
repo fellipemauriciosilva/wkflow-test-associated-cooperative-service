@@ -22,7 +22,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -47,6 +46,9 @@ class SessaoControllerTest {
     @Autowired
     private PautaRepository pautas;
 
+    @Autowired
+    private SessaoRepository sessoes;
+
     private Long pautaId;
 
     @BeforeEach
@@ -61,11 +63,23 @@ class SessaoControllerTest {
                 .andExpect(jsonPath("$.pautaId").value(pautaId))
                 .andExpect(jsonPath("$.inicio").isNotEmpty())
                 .andExpect(jsonPath("$.fim").isNotEmpty());
+
+        assertEquals(1L, sessoes.findAll().stream().filter(s -> pautaId.equals(s.getPautaId())).count());
     }
 
     @Test
     void ac22_semDuracaoSessaoDuraUmMinuto() throws Exception {
         mvc.perform(post("/pautas/{id}/sessao", pautaId))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.inicio").value(AGORA.toString()))
+                .andExpect(jsonPath("$.fim").value(AGORA.plus(Duration.ofMinutes(1)).toString()));
+    }
+
+    @Test
+    void ac22_duracaoNulaExplicitaSessaoDuraUmMinuto() throws Exception {
+        mvc.perform(post("/pautas/{id}/sessao", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"duracaoMinutos\": null}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.inicio").value(AGORA.toString()))
                 .andExpect(jsonPath("$.fim").value(AGORA.plus(Duration.ofMinutes(1)).toString()));
@@ -104,10 +118,28 @@ class SessaoControllerTest {
     }
 
     @Test
-    void duracaoNaoInteiraRetorna400() throws Exception {
+    void ac26_duracaoNaoInteiraRetorna400() throws Exception {
         mvc.perform(post("/pautas/{id}/sessao", pautaId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"duracaoMinutos\": \"abc\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
+    }
+
+    @Test
+    void ac26_duracaoFracionariaRetorna400() throws Exception {
+        mvc.perform(post("/pautas/{id}/sessao", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"duracaoMinutos\": 5.5}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
+    }
+
+    @Test
+    void ac26_duracaoStringNumericaRetorna400() throws Exception {
+        mvc.perform(post("/pautas/{id}/sessao", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"duracaoMinutos\": \"5\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
     }
