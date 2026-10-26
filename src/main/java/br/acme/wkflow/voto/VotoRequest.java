@@ -13,7 +13,15 @@ public record VotoRequest(
 
     public VotoRequest {
         if (associadoId != null) {
-            associadoId = associadoId.replaceAll("^ +| +$", "");
+            int ini = 0;
+            int fim = associadoId.length();
+            while (ini < fim && associadoId.charAt(ini) == ' ') {
+                ini++;
+            }
+            while (fim > ini && associadoId.charAt(fim - 1) == ' ') {
+                fim--;
+            }
+            associadoId = associadoId.substring(ini, fim);
         }
     }
 }

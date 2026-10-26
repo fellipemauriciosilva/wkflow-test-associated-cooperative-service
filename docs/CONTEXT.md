@@ -44,7 +44,7 @@
 - `Sessao` é entidade JPA (persistência assumida, ticket não define).
 - Voto: sessão aberta = `fim >= agora` (`existsByPautaIdAndFimGreaterThanEqual`), coerente com "aberta quando now <= fim" do ticket.
 - Ordem de validação do voto: pauta (404) → sessão (409) → valor (400) → duplicado (409). Duplicado: checagem prévia `existsByPautaIdAndAssociadoId`; constraint `uk_voto_pauta_associado` como rede de segurança. 409 só quando a causa é essa constraint (`ehViolacaoDeUnicidade`); outra violação de integridade propaga.
-- `associadoId` normalizado no construtor de `VotoRequest`: remove só espaço ASCII nas pontas (`replaceAll`, não `strip()`, para o `@Pattern` ver caracteres invisíveis). `"assoc-1 "` após `"assoc-1"` retorna 409.
+- `associadoId` normalizado no construtor de `VotoRequest`: remove só espaço ASCII nas pontas, por laço linear por índice (não `replaceAll`, que é quadrático em sequências de espaços; não `strip()`, para o `@Pattern` ver caracteres invisíveis). `"assoc-1 "` após `"assoc-1"` retorna 409. `"a" + 10000 espaços + "b"` retorna 400 sem voto (`associadoIdComSequenciaLongaDeEspacosRetorna400SemVoto`).
 - `associadoId` com caractere de controle, formatação ou separador Unicode (`\p{Cc}`, `\p{Cf}`, `\p{Zs}`, `\p{Zl}`, `\p{Zp}`, exceto espaço ASCII) retorna 400 via `@Pattern`, sem voto criado. Cobre NBSP, zero-width, BOM, U+2028 e NUL.
 - `detail` do 409 de voto é genérico (`Associado ja votou nesta pauta`), sem `associadoId`.
 - Sessão aberta, para voto e reabertura, é o mesmo critério: `fim >= agora`, centralizado em `SessaoRepository.abertaEm(pautaId, agora)` (default sobre `existsByPautaIdAndFimGreaterThanEqual`). `fim == agora` conta como aberta. Usado por `VotoController.votar` e `SessaoController.abrir`.
@@ -57,7 +57,7 @@
 
 - Fatia 1/3 (cadastro e consulta de pauta): `POST /pautas`, `GET /pautas/{id}`, erros 400, 404, 415 e 500 em ProblemDetail. Testes AC-1.1 a AC-1.5 em `PautaControllerTest`, mais casos de erro de framework.
 - Fatia 2/3 (abertura de sessão por pauta): `POST /pautas/{id}/sessao` com duração padrão 1 min, validação `1..1440`, 404 para pauta inexistente, bean `Clock`, reabertura 409. Testes AC-2.1 a AC-2.5 em `SessaoControllerTest` (`ac21` a `ac28`).
-- Fatia 3/3 (votos e resultado): `POST /pautas/{id}/votos` e `GET /pautas/{id}/resultado`, entidade `Voto` com constraint única, handlers de 409/400 em `TratamentoErrosGlobal`. Testes AC-3.1 a AC-3.8 em `VotoControllerTest` (`ac31` a `ac38`), mais teste de constraint no banco (`ac35_constraintUnica...`), validação de `associadoId` em branco e resultado sem votos. Suite completa: 50 testes verdes (9 pauta, 15 sessão, 26 voto), conferido nos relatórios Surefire. Ciclo de correção: `isCreated()` no primeiro POST de `ac35_detailDo409...`, `ac27_reaberturaComSessaoComFimExatoAgoraRetorna409`, `abertaEm` compartilhado, rejeição de caracteres invisíveis em `associadoId`.
+- Fatia 3/3 (votos e resultado): `POST /pautas/{id}/votos` e `GET /pautas/{id}/resultado`, entidade `Voto` com constraint única, handlers de 409/400 em `TratamentoErrosGlobal`. Testes AC-3.1 a AC-3.8 em `VotoControllerTest` (`ac31` a `ac38`), mais teste de constraint no banco (`ac35_constraintUnica...`), validação de `associadoId` em branco e resultado sem votos. Suite completa: 51 testes verdes (9 pauta, 15 sessão, 27 voto), conferido nos relatórios Surefire. Ciclo de correção: `isCreated()` no primeiro POST de `ac35_detailDo409...`, `ac27_reaberturaComSessaoComFimExatoAgoraRetorna409`, `abertaEm` compartilhado, rejeição de caracteres invisíveis em `associadoId`, trim linear de `associadoId` (fim do `replaceAll` quadrático).
 
 ## Armadilhas
 
@@ -99,4 +99,7 @@
 - Voto (review, armadilha): sem FK entre `voto.pauta_id` e `pauta`/`sessao`.
 - Voto (review, armadilha): 404 de pauta inexistente vs 409 de sem sessão permite enumerar pautas existentes e abertas. Aceito até auth.
 - Voto (review): ordem `@Valid` antes de pauta: `associadoId` em branco com pauta inexistente retorna 400, não 404. Doc de ordem é do domínio de `valor`/sessão/duplicado.
+- Voto (review, pendente): testes de categorias excluídas (`\p{Zp}`, `\p{Zs}` extra, `\p{Cf}` extra como U+202E, `\p{Cc}` extra) ainda não parametrizados. Teste positivo de espaço interno (`"assoc 1"` → 201) ainda falta.
+- Voto (review, pendente): `\p{Cs}` (surrogate solto, ex. `"\uD800"`) e `\p{Co}` aceitos pelo `@Pattern`; podem virar 500 na persistência.
+- Voto (review, pendente): `toUpperCase()` sem `Locale.ROOT` em `ehViolacaoDeUnicidade`.
 - Épico `wkflow-test-associated-cooperative-service` fecha com esta fatia; pendências acima precisam de confirmação do time antes de produção.
