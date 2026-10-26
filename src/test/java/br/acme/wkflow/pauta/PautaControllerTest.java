@@ -1,7 +1,6 @@
 package br.acme.wkflow.pauta;
 
 import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -9,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -43,11 +43,11 @@ class PautaControllerTest {
                         .content("{\"descricao\": \"Eleger diretoria\"}"))
                 .andExpect(status().isCreated())
                 .andReturn();
-        String id = com.jayway.jsonpath.JsonPath.read(criada.getResponse().getContentAsString(), "$.id").toString();
+        Long id = ((Number) JsonPath.read(criada.getResponse().getContentAsString(), "$.id")).longValue();
 
         mvc.perform(get("/pautas/{id}", id))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(Long.parseLong(id)))
+                .andExpect(jsonPath("$.id").value(id))
                 .andExpect(jsonPath("$.descricao").value("Eleger diretoria"));
     }
 
@@ -57,7 +57,7 @@ class PautaControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
                 .andExpect(jsonPath("$.status").value(404))
-                .andExpect(jsonPath("$.title").value(notNullValue()))
+                .andExpect(jsonPath("$.title").value("Not Found"))
                 .andExpect(jsonPath("$.detail").value(containsString("999999")));
     }
 
@@ -73,7 +73,8 @@ class PautaControllerTest {
             mvc.perform(post("/pautas")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(corpo))
-                    .andExpect(status().isBadRequest());
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
         }
     }
 
@@ -92,7 +93,33 @@ class PautaControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.title").value(notNullValue()))
-                .andExpect(jsonPath("$.detail").value(notNullValue()));
+                .andExpect(jsonPath("$.title").value("Bad Request"))
+                .andExpect(jsonPath("$.detail").value("Requisicao invalida"));
+    }
+
+    @Test
+    void getComIdNaoNumericoRetorna400ProblemDetail() throws Exception {
+        mvc.perform(get("/pautas/abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
+    }
+
+    @Test
+    void postComContentTypeTextoRetorna415ProblemDetail() throws Exception {
+        mvc.perform(post("/pautas")
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("descricao"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
+    }
+
+    @Test
+    void postComDescricaoDe256CaracteresRetorna400SemErro500() throws Exception {
+        String descricao = "a".repeat(256);
+        mvc.perform(post("/pautas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"descricao\": \"" + descricao + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
     }
 }
