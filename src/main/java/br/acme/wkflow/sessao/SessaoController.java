@@ -37,7 +37,7 @@ public class SessaoController {
             @Valid @RequestBody(required = false) SessaoRequest request) {
         pautas.buscarComLock(id).orElseThrow(() -> new PautaNaoEncontradaException(id));
         Instant inicio = Instant.now(clock);
-        if (sessoes.existsByPautaIdAndFimAfter(id, inicio)) {
+        if (sessoes.existsByPautaIdAndFimGreaterThanEqual(id, inicio)) {
             throw new SessaoJaAbertaException(id);
         }
         long duracao = request == null || request.duracaoMinutos() == null

@@ -1,7 +1,9 @@
 package br.acme.wkflow.voto;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -16,6 +18,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -82,6 +85,17 @@ class VotoControllerTest {
     }
 
     @Test
+    void ac31_votoComSessaoNoFimExatoRetorna201() throws Exception {
+        Long fronteira = pautas.save(new Pauta("Fronteira")).getId();
+        sessoes.save(new Sessao(fronteira, AGORA.minus(Duration.ofMinutes(5)), AGORA));
+
+        mvc.perform(post("/pautas/{id}/votos", fronteira)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(votoJson("assoc-1", "SIM")))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
     void ac32_votoSemSessaoRetorna409() throws Exception {
         Long semSessao = pautas.save(new Pauta("Sem sessao")).getId();
 
@@ -123,10 +137,20 @@ class VotoControllerTest {
     }
 
     @Test
+    void ac34_valorNullRetorna400() throws Exception {
+        mvc.perform(post("/pautas/{id}/votos", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"associadoId\": \"assoc-1\", \"valor\": null}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
+    }
+
+    @Test
     void ac35_segundoVotoMesmoAssociadoNaMesmaPautaRetorna409() throws Exception {
         mvc.perform(post("/pautas/{id}/votos", pautaId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(votoJson("assoc-1", "SIM")));
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(votoJson("assoc-1", "SIM")))
+                .andExpect(status().isCreated());
 
         mvc.perform(post("/pautas/{id}/votos", pautaId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -144,16 +168,70 @@ class VotoControllerTest {
     }
 
     @Test
+    void ac35_violacaoDaConstraintDaTabelaVotoEhReconhecida() {
+        votos.saveAndFlush(new Voto(pautaId, "assoc-4", ValorVoto.SIM));
+
+        DataIntegrityViolationException ex = assertThrows(DataIntegrityViolationException.class,
+                () -> votos.saveAndFlush(new Voto(pautaId, "assoc-4", ValorVoto.NAO)));
+
+        assertTrue(VotoController.ehViolacaoDeUnicidade(ex));
+    }
+
+    @Test
+    void ac35_outraViolacaoDeIntegridadeNaoEhTratadaComoDuplicidade() {
+        var outra = new ConstraintViolationException("outra", null, "uk_outra");
+
+        assertFalse(VotoController.ehViolacaoDeUnicidade(new DataIntegrityViolationException("outra", outra)));
+    }
+
+    @Test
+    void ac35_violacaoSemConstraintNomeadaNaoEhTratadaComoDuplicidade() {
+        assertFalse(VotoController.ehViolacaoDeUnicidade(new DataIntegrityViolationException("not null")));
+    }
+
+    @Test
+    void ac35_associadoIdComEspacoExtraEhMesmoAssociado() throws Exception {
+        mvc.perform(post("/pautas/{id}/votos", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(votoJson("assoc-1", "SIM")))
+                .andExpect(status().isCreated());
+
+        mvc.perform(post("/pautas/{id}/votos", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(votoJson("assoc-1 ", "NAO")))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
+    }
+
+    @Test
+    void ac35_detailDo409NaoExpoeAssociadoId() throws Exception {
+        mvc.perform(post("/pautas/{id}/votos", pautaId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(votoJson("assoc-segredo", "SIM")));
+
+        String corpo = mvc.perform(post("/pautas/{id}/votos", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(votoJson("assoc-segredo", "SIM")))
+                .andExpect(status().isConflict())
+                .andReturn().getResponse().getContentAsString();
+
+        assertFalse(corpo.contains("assoc-segredo"));
+    }
+
+    @Test
     void ac36_resultadoMostraTotaisSimNaoETotal() throws Exception {
         mvc.perform(post("/pautas/{id}/votos", pautaId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(votoJson("assoc-1", "SIM")));
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(votoJson("assoc-1", "SIM")))
+                .andExpect(status().isCreated());
         mvc.perform(post("/pautas/{id}/votos", pautaId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(votoJson("assoc-2", "SIM")));
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(votoJson("assoc-2", "SIM")))
+                .andExpect(status().isCreated());
         mvc.perform(post("/pautas/{id}/votos", pautaId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(votoJson("assoc-3", "NAO")));
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(votoJson("assoc-3", "NAO")))
+                .andExpect(status().isCreated());
 
         mvc.perform(get("/pautas/{id}/resultado", pautaId))
                 .andExpect(status().isOk())
@@ -190,8 +268,9 @@ class VotoControllerTest {
     @Test
     void ac38_duplicadoComValorInvalidoRetorna400() throws Exception {
         mvc.perform(post("/pautas/{id}/votos", pautaId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(votoJson("assoc-1", "SIM")));
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(votoJson("assoc-1", "SIM")))
+                .andExpect(status().isCreated());
 
         mvc.perform(post("/pautas/{id}/votos", pautaId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -204,6 +283,24 @@ class VotoControllerTest {
         mvc.perform(post("/pautas/{id}/votos", pautaId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(votoJson("   ", "SIM")))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
+    }
+
+    @Test
+    void associadoIdNullRetorna400() throws Exception {
+        mvc.perform(post("/pautas/{id}/votos", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"associadoId\": null, \"valor\": \"SIM\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
+    }
+
+    @Test
+    void associadoIdAcimaDe255CaracteresRetorna400() throws Exception {
+        mvc.perform(post("/pautas/{id}/votos", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(votoJson("a".repeat(256), "SIM")))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
     }

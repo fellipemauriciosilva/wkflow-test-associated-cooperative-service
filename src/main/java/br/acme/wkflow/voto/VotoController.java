@@ -6,6 +6,7 @@ import br.acme.wkflow.sessao.SessaoRepository;
 import jakarta.validation.Valid;
 import java.time.Clock;
 import java.time.Instant;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -44,13 +45,30 @@ public class VotoController {
             throw new SessaoNaoAbertaException(id);
         }
         ValorVoto valor = ValorVoto.de(request.valor());
+        if (votos.existsByPautaIdAndAssociadoId(id, request.associadoId())) {
+            throw new VotoDuplicadoException();
+        }
         try {
             votos.saveAndFlush(new Voto(id, request.associadoId(), valor));
         } catch (DataIntegrityViolationException ex) {
-            throw new VotoDuplicadoException(id, request.associadoId());
+            if (ehViolacaoDeUnicidade(ex)) {
+                throw new VotoDuplicadoException();
+            }
+            throw ex;
         }
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new VotoResponse(id, request.associadoId(), valor));
+    }
+
+    static boolean ehViolacaoDeUnicidade(DataIntegrityViolationException ex) {
+        for (Throwable causa = ex; causa != null; causa = causa.getCause()) {
+            if (causa instanceof ConstraintViolationException cve
+                    && cve.getConstraintName() != null
+                    && cve.getConstraintName().toUpperCase().contains(Voto.UK_PAUTA_ASSOCIADO.toUpperCase())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @GetMapping("/resultado")
