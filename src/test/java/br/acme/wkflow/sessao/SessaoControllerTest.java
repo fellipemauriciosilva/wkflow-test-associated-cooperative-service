@@ -158,6 +158,24 @@ class SessaoControllerTest {
     }
 
     @Test
+    void ac25_contentTypeErradoComCorpoRetorna415() throws Exception {
+        mvc.perform(post("/pautas/{id}/sessao", pautaId)
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("{\"duracaoMinutos\": 5}"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
+    }
+
+    @Test
+    void ac25_validacaoAntesDeExistenciaDaPauta_duracaoInvalidaRetorna400() throws Exception {
+        mvc.perform(post("/pautas/{id}/sessao", 999999L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"duracaoMinutos\": 0}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
+    }
+
+    @Test
     void ac26_duracaoStringNumericaRetorna400() throws Exception {
         mvc.perform(post("/pautas/{id}/sessao", pautaId)
                         .contentType(MediaType.APPLICATION_JSON)

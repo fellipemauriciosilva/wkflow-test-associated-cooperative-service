@@ -34,14 +34,18 @@
 - `inicio` = `Instant.now(clock)`; `fim` = `inicio + duracaoMinutos`. Duração ausente ou `null` = 1 minuto.
 - Duração validada com `@Min(1)` no `SessaoRequest` (0 e negativos retornam 400).
 - Coerção Jackson desligada para inteiros em `br.acme.wkflow.json.ConfiguracaoJson`: `5.5` (ACCEPT_FLOAT_AS_INT off) e `"5"` (String para Integer = Fail) retornam 400. `"abc"` também 400.
-- Pauta inexistente no POST de sessão retorna 404 via `existsById` antes de criar a sessão.
+- Pauta inexistente no POST de sessão retorna 404: `buscarComLock` (`PESSIMISTIC_WRITE`) dentro de `@Transactional` em `SessaoController.abrir`.
+- Reabertura: POST com sessão ainda aberta da mesma pauta (`fim > agora`) retorna 409 ProblemDetail (`SessaoJaAbertaException`). Sessão expirada não bloqueia: nova linha criada (`ac27`).
+- Corrida na abertura: o lock de pauta serializa dois POSTs concorrentes; o segundo vê a sessão do primeiro e recebe 409. Sem teste de concorrência real (H2 e MockMvc single-thread); a garantia vem do lock, não de teste.
+- Ordem de validação: `@Valid` roda antes da busca da pauta. Pauta inexistente + duração inválida retorna 400 (pinado por `ac25_validacaoAntesDeExistenciaDaPauta`).
+- Content-Type errado com corpo no POST de sessão retorna 415 ProblemDetail (`ac25_contentTypeErrado...`).
 - Sem autenticação, sem listagem, sem limite superior de duração (ticket não define teto).
 - `Sessao` é entidade JPA (persistência assumida, ticket não define).
 
 ## Entregas
 
 - Fatia 1/3 (cadastro e consulta de pauta): `POST /pautas`, `GET /pautas/{id}`, erros 400, 404, 415 e 500 em ProblemDetail. Testes AC-1.1 a AC-1.5 em `PautaControllerTest`, mais casos de erro de framework (GET id não numérico, Content-Type errado, descrição de 256 caracteres).
-- Fatia 2/3 (abertura de sessão por pauta): `POST /pautas/{id}/sessao` com duração padrão 1 min, validação `>= 1`, 404 para pauta inexistente, bean `Clock`. Testes AC-2.1 a AC-2.5 em `SessaoControllerTest` (`Clock` fixo), mais casos de duração não inteira (`"abc"`, `5.5`, `"5"`), `duracaoMinutos: null` explícito e asserção de persistência por `pautaId` no AC-2.1. Reabertura de sessão NÃO implementada (Won't desta fatia, gap bloqueante, ver Pendências).
+- Fatia 2/3 (abertura de sessão por pauta): `POST /pautas/{id}/sessao` com duração padrão 1 min, validação `>= 1`, 404 para pauta inexistente, bean `Clock`. Testes AC-2.1 a AC-2.5 em `SessaoControllerTest` (`Clock` fixo), mais casos de duração não inteira (`"abc"`, `5.5`, `"5"`), `duracaoMinutos: null` explícito e asserção de persistência por `pautaId` no AC-2.1. Reabertura com sessão aberta: 409 (`ac27`). Testes de sessão nomeados `ac21` a `ac27` (ac25 = validação e 415, ac26 = tipo inválido da duração, ac27 = reabertura).
 
 ## Armadilhas
 
@@ -53,7 +57,8 @@
 - `Location` montado com path relativo (`/pautas/{id}`). Pode quebrar atrás de proxy com context path. Ver pendências.
 - Sem request body cap no código. Limitar no proxy/gateway. `max-http-form-post-size` não cobre body JSON.
 - `@RequestBody(required = false)` no POST de sessão: body ausente cai no padrão de 1 min. `Content-Type` errado continua 415.
-- Segunda abertura de sessão para a mesma pauta cria outra linha sem checar a anterior (sem teste, por ser Won't). Comportamento de reabertura (substituir, estender ou 409) pendente.
+- Lock pessimista só vale dentro da transação de `abrir`. Se alguém chamar `buscarComLock` fora de `@Transactional`, o lock não existe.
+- `existsByPautaIdAndFimAfter` sem índice em `pautaId`: full scan. Índice ainda pendente.
 - Pauta removida entre `existsById` e `save` cria sessão órfã. Sem remoção de pauta hoje; aceito.
 - `Instant` no JSON depende de Jackson não escrever timestamp numérico (`write-dates-as-timestamps` default off). `ac22`/`ac23` quebram se mudar.
 
@@ -61,10 +66,10 @@
 
 - Confirmar com o ticket: `@Valid` (S1), Spring Data JPA e formato do body do GET e do 201 de sessão (assumidos).
 - Gap 5: campos da pauta além de `descricao` não definidos. Só `descricao` implementado.
-- Gap bloqueante (fatia 2): reabrir sessão já aberta. Substituir, estender ou rejeitar com 409 (assumido no master, W4 em aberto). Não implementado; sem teste para o caso. Quando decidido, proteger com lock pessimista na pauta ou índice único parcial, com teste de concorrência.
-- Ordem de validação: `@Valid` roda antes de `existsById`. Pauta inexistente + duração inválida retorna 400, não 404. Confirmar ordem.
-- Teto superior de duração: sem `@Max`. Definir antes da fatia 3.
-- `Sessao.pautaId` sem índice nem FK. Reabertura por `pautaId` vira full scan; adicionar índice junto com a regra de reabertura.
+- Reabertura decidida: 409 com sessão aberta (W4 do master em aberto, confirmar com o time). Ainda sem índice em `Sessao.pautaId`.
+- Teto superior de duração: sem `@Max`. `Integer.MAX_VALUE` aceito e gera fim ~4000 anos à frente. Definir antes da fatia 3 ou no merge.
+- Escopo global do Jackson (`ConfiguracaoJson` afeta todo ObjectMapper): qualquer campo `Integer` futuro rejeita `5.5` e `"5"`. Hoje nenhum DTO é afetado além de `SessaoRequest`.
+- Sem autenticação nem limite de criação de sessões por pauta: risco de pré-auth aceito nesta fatia.
 - Confirmar: duração `null` explícita como padrão (assumido); teto superior de duração (não definido).
 - Fatia 3 (votos) depende de `Sessao` e do comportamento de reabertura.
 - Fora de escopo nesta correção (não implementado): normalizar espaços de `descricao` com `strip()` no DTO; `ServletUriComponentsBuilder` para `Location`; `spring.jpa.open-in-view=false`; varredura de dependências (SCA) contra o proxy interno antes do merge.
