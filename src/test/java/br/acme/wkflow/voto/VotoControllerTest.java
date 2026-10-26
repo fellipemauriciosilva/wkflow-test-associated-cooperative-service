@@ -207,7 +207,8 @@ class VotoControllerTest {
     void ac35_detailDo409NaoExpoeAssociadoId() throws Exception {
         mvc.perform(post("/pautas/{id}/votos", pautaId)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(votoJson("assoc-segredo", "SIM")));
+                .content(votoJson("assoc-segredo", "SIM")))
+                .andExpect(status().isCreated());
 
         String corpo = mvc.perform(post("/pautas/{id}/votos", pautaId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -294,6 +295,41 @@ class VotoControllerTest {
                         .content("{\"associadoId\": null, \"valor\": \"SIM\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
+    }
+
+    @Test
+    void associadoIdComCaractereInvisivelRetorna400SemCriarVoto() throws Exception {
+        String[] invisiveis = {
+                "assoc-1\\u00A0", "assoc\\u200B-1", "\\uFEFFassoc-1", "assoc-1\\u2028", "assoc\\u0000-1"
+        };
+        for (String associado : invisiveis) {
+            Long pauta = pautas.save(new Pauta("Invisivel")).getId();
+            sessoes.save(new Sessao(pauta, AGORA.minus(Duration.ofMinutes(1)), AGORA.plus(Duration.ofMinutes(5))));
+
+            mvc.perform(post("/pautas/{id}/votos", pauta)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(votoJson(associado, "SIM")))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
+
+            assertEquals(0L, votos.findAll().stream().filter(v -> pauta.equals(v.getPautaId())).count());
+        }
+    }
+
+    @Test
+    void associadoIdComNbspDepoisDeVotoExistenteRetorna400SemVotoNovo() throws Exception {
+        mvc.perform(post("/pautas/{id}/votos", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(votoJson("assoc-1", "SIM")))
+                .andExpect(status().isCreated());
+
+        mvc.perform(post("/pautas/{id}/votos", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(votoJson("assoc-1\\u00A0", "NAO")))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
+
+        assertEquals(1L, votos.findAll().stream().filter(v -> pautaId.equals(v.getPautaId())).count());
     }
 
     @Test

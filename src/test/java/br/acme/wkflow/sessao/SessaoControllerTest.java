@@ -147,6 +147,17 @@ class SessaoControllerTest {
     }
 
     @Test
+    void ac27_reaberturaComSessaoComFimExatoAgoraRetorna409() throws Exception {
+        sessoes.save(new Sessao(pautaId, AGORA.minus(Duration.ofMinutes(5)), AGORA));
+
+        mvc.perform(post("/pautas/{id}/sessao", pautaId))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
+
+        assertEquals(1L, sessoes.findAll().stream().filter(s -> pautaId.equals(s.getPautaId())).count());
+    }
+
+    @Test
     void ac27_reaberturaAposSessaoExpiradaRetorna201() throws Exception {
         sessoes.save(new Sessao(pautaId, AGORA.minus(Duration.ofMinutes(10)), AGORA.minus(Duration.ofMinutes(5))));
 

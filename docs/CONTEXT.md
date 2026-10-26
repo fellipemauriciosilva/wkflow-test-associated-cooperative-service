@@ -44,9 +44,10 @@
 - `Sessao` é entidade JPA (persistência assumida, ticket não define).
 - Voto: sessão aberta = `fim >= agora` (`existsByPautaIdAndFimGreaterThanEqual`), coerente com "aberta quando now <= fim" do ticket.
 - Ordem de validação do voto: pauta (404) → sessão (409) → valor (400) → duplicado (409). Duplicado: checagem prévia `existsByPautaIdAndAssociadoId`; constraint `uk_voto_pauta_associado` como rede de segurança. 409 só quando a causa é essa constraint (`ehViolacaoDeUnicidade`); outra violação de integridade propaga.
-- `associadoId` normalizado com `strip()` no construtor de `VotoRequest`, antes de validar e persistir. `"assoc-1 "` após `"assoc-1"` retorna 409.
+- `associadoId` normalizado no construtor de `VotoRequest`: remove só espaço ASCII nas pontas (`replaceAll`, não `strip()`, para o `@Pattern` ver caracteres invisíveis). `"assoc-1 "` após `"assoc-1"` retorna 409.
+- `associadoId` com caractere de controle, formatação ou separador Unicode (`\p{Cc}`, `\p{Cf}`, `\p{Zs}`, `\p{Zl}`, `\p{Zp}`, exceto espaço ASCII) retorna 400 via `@Pattern`, sem voto criado. Cobre NBSP, zero-width, BOM, U+2028 e NUL.
 - `detail` do 409 de voto é genérico (`Associado ja votou nesta pauta`), sem `associadoId`.
-- Sessão aberta, para voto e reabertura, é o mesmo critério: `fim >= agora` (`existsByPautaIdAndFimGreaterThanEqual`). `fim == agora` conta como aberta.
+- Sessão aberta, para voto e reabertura, é o mesmo critério: `fim >= agora`, centralizado em `SessaoRepository.abertaEm(pautaId, agora)` (default sobre `existsByPautaIdAndFimGreaterThanEqual`). `fim == agora` conta como aberta. Usado por `VotoController.votar` e `SessaoController.abrir`.
 - `associadoId` string livre no body, `@NotBlank` e `@Size(max = 255)`. Sem validação de cadastro (gap 1 assumido).
 - `GET /pautas/{id}/resultado` retorna `{"sim", "nao", "total"}` com contagem parcial, consultável com sessão aberta (gap 2 assumido). Pauta inexistente 404.
 - Voto com sessão fechada ou inexistente: 409 (gap 3 assumido).
@@ -56,7 +57,7 @@
 
 - Fatia 1/3 (cadastro e consulta de pauta): `POST /pautas`, `GET /pautas/{id}`, erros 400, 404, 415 e 500 em ProblemDetail. Testes AC-1.1 a AC-1.5 em `PautaControllerTest`, mais casos de erro de framework.
 - Fatia 2/3 (abertura de sessão por pauta): `POST /pautas/{id}/sessao` com duração padrão 1 min, validação `1..1440`, 404 para pauta inexistente, bean `Clock`, reabertura 409. Testes AC-2.1 a AC-2.5 em `SessaoControllerTest` (`ac21` a `ac28`).
-- Fatia 3/3 (votos e resultado): `POST /pautas/{id}/votos` e `GET /pautas/{id}/resultado`, entidade `Voto` com constraint única, handlers de 409/400 em `TratamentoErrosGlobal`. Testes AC-3.1 a AC-3.8 em `VotoControllerTest` (`ac31` a `ac38`), mais teste de constraint no banco (`ac35_constraintUnica...`), validação de `associadoId` em branco e resultado sem votos. Suite completa: 46 testes verdes (9 pauta, 14 sessão, 23 voto), conferido nos relatórios Surefire.
+- Fatia 3/3 (votos e resultado): `POST /pautas/{id}/votos` e `GET /pautas/{id}/resultado`, entidade `Voto` com constraint única, handlers de 409/400 em `TratamentoErrosGlobal`. Testes AC-3.1 a AC-3.8 em `VotoControllerTest` (`ac31` a `ac38`), mais teste de constraint no banco (`ac35_constraintUnica...`), validação de `associadoId` em branco e resultado sem votos. Suite completa: 49 testes verdes (9 pauta, 15 sessão, 25 voto), conferido nos relatórios Surefire. Ciclo de correção: `isCreated()` no primeiro POST de `ac35_detailDo409...`, `ac27_reaberturaComSessaoComFimExatoAgoraRetorna409`, `abertaEm` compartilhado, rejeição de caracteres invisíveis em `associadoId`.
 
 ## Armadilhas
 

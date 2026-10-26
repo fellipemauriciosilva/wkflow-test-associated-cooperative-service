@@ -41,7 +41,7 @@ public class VotoController {
             throw new PautaNaoEncontradaException(id);
         }
         Instant agora = Instant.now(clock);
-        if (!sessoes.existsByPautaIdAndFimGreaterThanEqual(id, agora)) {
+        if (!sessoes.abertaEm(id, agora)) {
             throw new SessaoNaoAbertaException(id);
         }
         ValorVoto valor = ValorVoto.de(request.valor());
