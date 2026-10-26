@@ -5,5 +5,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface SessaoRepository extends JpaRepository<Sessao, Long> {
 
-    boolean existsByPautaIdAndFimAfter(Long pautaId, Instant agora);
+    boolean existsByPautaIdAndFimGreaterThanEqual(Long pautaId, Instant agora);
+
+    default boolean abertaEm(Long pautaId, Instant agora) {
+        return existsByPautaIdAndFimGreaterThanEqual(pautaId, agora);
+    }
 }
