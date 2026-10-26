@@ -39,13 +39,14 @@
 - Corrida na abertura: o lock de pauta serializa dois POSTs concorrentes; o segundo vê a sessão do primeiro e recebe 409. Sem teste de concorrência real (H2 e MockMvc single-thread); a garantia vem do lock, não de teste.
 - Ordem de validação: `@Valid` roda antes da busca da pauta. Pauta inexistente + duração inválida retorna 400 (pinado por `ac25_validacaoAntesDeExistenciaDaPauta`).
 - Content-Type errado com corpo no POST de sessão retorna 415 ProblemDetail (`ac25_contentTypeErrado...`).
-- Sem autenticação, sem listagem, sem limite superior de duração (ticket não define teto).
+- Duração de sessão entre 1 e 1440 minutos: `@Min(1)` e `@Max(1440)` no `SessaoRequest`. Acima de 1440 retorna 400 e nada é persistido (`ac28`). Teto 1440 é placeholder (1 dia), confirmar com dono do ticket.
+- Sem autenticação, sem listagem.
 - `Sessao` é entidade JPA (persistência assumida, ticket não define).
 
 ## Entregas
 
 - Fatia 1/3 (cadastro e consulta de pauta): `POST /pautas`, `GET /pautas/{id}`, erros 400, 404, 415 e 500 em ProblemDetail. Testes AC-1.1 a AC-1.5 em `PautaControllerTest`, mais casos de erro de framework (GET id não numérico, Content-Type errado, descrição de 256 caracteres).
-- Fatia 2/3 (abertura de sessão por pauta): `POST /pautas/{id}/sessao` com duração padrão 1 min, validação `>= 1`, 404 para pauta inexistente, bean `Clock`. Testes AC-2.1 a AC-2.5 em `SessaoControllerTest` (`Clock` fixo), mais casos de duração não inteira (`"abc"`, `5.5`, `"5"`), `duracaoMinutos: null` explícito e asserção de persistência por `pautaId` no AC-2.1. Reabertura com sessão aberta: 409 (`ac27`). Testes de sessão nomeados `ac21` a `ac27` (ac25 = validação e 415, ac26 = tipo inválido da duração, ac27 = reabertura).
+- Fatia 2/3 (abertura de sessão por pauta): `POST /pautas/{id}/sessao` com duração padrão 1 min, validação `>= 1`, 404 para pauta inexistente, bean `Clock`. Testes AC-2.1 a AC-2.5 em `SessaoControllerTest` (`Clock` fixo), mais casos de duração não inteira (`"abc"`, `5.5`, `"5"`), `duracaoMinutos: null` explícito e asserção de persistência por `pautaId` no AC-2.1. Reabertura com sessão aberta: 409 (`ac27`). Teto de duração 1440 min com 400 e sem persistência (`ac28`). Testes de sessão nomeados `ac21` a `ac28` (ac25 = validação e 415, ac26 = tipo inválido da duração, ac27 = reabertura, ac28 = teto).
 
 ## Armadilhas
 
@@ -67,9 +68,9 @@
 - Confirmar com o ticket: `@Valid` (S1), Spring Data JPA e formato do body do GET e do 201 de sessão (assumidos).
 - Gap 5: campos da pauta além de `descricao` não definidos. Só `descricao` implementado.
 - Reabertura decidida: 409 com sessão aberta (W4 do master em aberto, confirmar com o time). Ainda sem índice em `Sessao.pautaId`.
-- Teto superior de duração: sem `@Max`. `Integer.MAX_VALUE` aceito e gera fim ~4000 anos à frente. Definir antes da fatia 3 ou no merge.
+- Teto de duração 1440 min (`@Max`) é placeholder de 1 dia. Valor real a confirmar com dono do ticket; sem confirmação, manter 1440.
 - Escopo global do Jackson (`ConfiguracaoJson` afeta todo ObjectMapper): qualquer campo `Integer` futuro rejeita `5.5` e `"5"`. Hoje nenhum DTO é afetado além de `SessaoRequest`.
 - Sem autenticação nem limite de criação de sessões por pauta: risco de pré-auth aceito nesta fatia.
-- Confirmar: duração `null` explícita como padrão (assumido); teto superior de duração (não definido).
+- Confirmar: duração `null` explícita como padrão (assumido); teto de duração 1440 (placeholder).
 - Fatia 3 (votos) depende de `Sessao` e do comportamento de reabertura.
 - Fora de escopo nesta correção (não implementado): normalizar espaços de `descricao` com `strip()` no DTO; `ServletUriComponentsBuilder` para `Location`; `spring.jpa.open-in-view=false`; varredura de dependências (SCA) contra o proxy interno antes do merge.

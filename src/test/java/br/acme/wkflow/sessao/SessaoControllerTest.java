@@ -183,4 +183,15 @@ class SessaoControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
     }
+
+    @Test
+    void ac28_duracaoAcimaDoTetoRetorna400() throws Exception {
+        mvc.perform(post("/pautas/{id}/sessao", pautaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"duracaoMinutos\": 1441}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
+
+        assertEquals(0L, sessoes.findAll().stream().filter(s -> pautaId.equals(s.getPautaId())).count());
+    }
 }
