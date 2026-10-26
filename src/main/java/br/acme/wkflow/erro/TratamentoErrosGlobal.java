@@ -1,6 +1,7 @@
 package br.acme.wkflow.erro;
 
 import br.acme.wkflow.pauta.PautaNaoEncontradaException;
+import br.acme.wkflow.sessao.SessaoJaAbertaException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -24,6 +25,11 @@ public class TratamentoErrosGlobal {
     @ExceptionHandler(PautaNaoEncontradaException.class)
     public ProblemDetail pautaNaoEncontrada(PautaNaoEncontradaException ex) {
         return problema(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(SessaoJaAbertaException.class)
+    public ProblemDetail sessaoJaAberta(SessaoJaAbertaException ex) {
+        return problema(HttpStatus.CONFLICT, ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

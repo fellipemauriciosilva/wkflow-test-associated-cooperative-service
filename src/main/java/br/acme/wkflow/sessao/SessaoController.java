@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -31,15 +32,17 @@ public class SessaoController {
     }
 
     @PostMapping
+    @Transactional
     public ResponseEntity<SessaoResponse> abrir(@PathVariable Long id,
             @Valid @RequestBody(required = false) SessaoRequest request) {
-        if (!pautas.existsById(id)) {
-            throw new PautaNaoEncontradaException(id);
+        pautas.buscarComLock(id).orElseThrow(() -> new PautaNaoEncontradaException(id));
+        Instant inicio = Instant.now(clock);
+        if (sessoes.existsByPautaIdAndFimAfter(id, inicio)) {
+            throw new SessaoJaAbertaException(id);
         }
         long duracao = request == null || request.duracaoMinutos() == null
                 ? DURACAO_PADRAO_MINUTOS
                 : request.duracaoMinutos();
-        Instant inicio = Instant.now(clock);
         Sessao salva = sessoes.save(new Sessao(id, inicio, inicio.plus(duracao, ChronoUnit.MINUTES)));
         return ResponseEntity.status(HttpStatus.CREATED).body(SessaoResponse.de(salva));
     }

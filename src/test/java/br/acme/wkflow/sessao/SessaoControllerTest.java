@@ -136,6 +136,28 @@ class SessaoControllerTest {
     }
 
     @Test
+    void ac27_reaberturaComSessaoAindaAbertaRetorna409() throws Exception {
+        sessoes.save(new Sessao(pautaId, AGORA.minus(Duration.ofMinutes(1)), AGORA.plus(Duration.ofMinutes(5))));
+
+        mvc.perform(post("/pautas/{id}/sessao", pautaId))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON));
+
+        assertEquals(1L, sessoes.findAll().stream().filter(s -> pautaId.equals(s.getPautaId())).count());
+    }
+
+    @Test
+    void ac27_reaberturaAposSessaoExpiradaRetorna201() throws Exception {
+        sessoes.save(new Sessao(pautaId, AGORA.minus(Duration.ofMinutes(10)), AGORA.minus(Duration.ofMinutes(5))));
+
+        mvc.perform(post("/pautas/{id}/sessao", pautaId))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.inicio").value(AGORA.toString()));
+
+        assertEquals(2L, sessoes.findAll().stream().filter(s -> pautaId.equals(s.getPautaId())).count());
+    }
+
+    @Test
     void ac26_duracaoStringNumericaRetorna400() throws Exception {
         mvc.perform(post("/pautas/{id}/sessao", pautaId)
                         .contentType(MediaType.APPLICATION_JSON)
